@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { User, Calendar, Target, Activity } from "lucide-react"
+import { getProfile } from "@/actions/profile"
+import { getCurrentCycle } from "@/actions/cycles"
 
 interface UserProfile {
   name: string
@@ -22,10 +24,38 @@ export function ProfileView() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("flowfit-profile")
-    if (storedProfile) {
-      setProfile(JSON.parse(storedProfile))
+    const loadProfile = async () => {
+      try {
+        const { data: profileData } = await getProfile()
+        if (profileData) {
+          const parsedProfile: UserProfile = {
+            name: profileData.name,
+            age: profileData.age?.toString() || "",
+            fitnessLevel: profileData.fitnessLevel || "",
+            goals: profileData.goals || [],
+            mode: profileData.mode as "cycle" | "pregnancy",
+            trimester: profileData.trimester || undefined,
+            cycleLength: "28",
+            periodLength: "5",
+          }
+          
+          if (profileData.mode === "cycle") {
+            const { data: cycleData } = await getCurrentCycle()
+            if (cycleData) {
+              parsedProfile.cycleLength = cycleData.cycleLength?.toString() || "28"
+              parsedProfile.periodLength = cycleData.periodLength?.toString() || "5"
+              parsedProfile.lastPeriodDate = cycleData.lastPeriodDate || undefined
+            }
+          }
+          
+          setProfile(parsedProfile)
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error)
+      }
     }
+
+    loadProfile()
   }, [])
 
   if (!profile) {

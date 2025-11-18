@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TrendingUp, Flame, Clock, Target, Award, CalendarIcon, Activity } from "lucide-react"
 import { Bar, BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { getProfile } from "@/actions/profile"
 
 interface WorkoutLog {
   date: string
@@ -34,17 +35,29 @@ export function ProgressView() {
   })
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("flowfit-profile")
-    if (storedProfile) {
-      setProfile(JSON.parse(storedProfile))
+    const loadData = async () => {
+      try {
+        const { data: profileData } = await getProfile()
+        if (profileData) {
+          setProfile({
+            name: profileData.name,
+            goals: profileData.goals || [],
+          })
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error)
+        setProfile({ name: "User", goals: [] })
+      }
+
+      // Generate sample workout data for demonstration
+      const sampleLogs = generateSampleWorkoutLogs()
+      setWorkoutLogs(sampleLogs)
+
+      // Calculate stats
+      calculateStats(sampleLogs)
     }
 
-    // Generate sample workout data for demonstration
-    const sampleLogs = generateSampleWorkoutLogs()
-    setWorkoutLogs(sampleLogs)
-
-    // Calculate stats
-    calculateStats(sampleLogs)
+    loadData()
   }, [])
 
   const generateSampleWorkoutLogs = (): WorkoutLog[] => {

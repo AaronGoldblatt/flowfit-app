@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Droplets, Moon, Sparkles, Sun, Plus, TrendingUp } from "lucide-react"
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, differenceInDays } from "date-fns"
+import { getProfile } from "@/actions/profile"
+import { getCurrentCycle } from "@/actions/cycles"
 
 interface UserProfile {
   name: string
@@ -43,15 +45,38 @@ export function CycleTracker() {
   })
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("flowfit-profile")
-    if (storedProfile) {
-      setProfile(JSON.parse(storedProfile))
+    const loadData = async () => {
+      try {
+        const { data: profileData } = await getProfile()
+        if (profileData) {
+          const parsedProfile: UserProfile = {
+            name: profileData.name,
+            mode: profileData.mode as "cycle" | "pregnancy",
+            cycleLength: "28",
+            periodLength: "5",
+          }
+          
+          const { data: cycleData } = await getCurrentCycle()
+          if (cycleData) {
+            parsedProfile.lastPeriodDate = cycleData.lastPeriodDate || undefined
+            parsedProfile.cycleLength = cycleData.cycleLength?.toString() || "28"
+            parsedProfile.periodLength = cycleData.periodLength?.toString() || "5"
+          }
+          
+          setProfile(parsedProfile)
+        }
+      } catch (error) {
+        console.error("Error loading cycle data:", error)
+        setProfile({
+          name: "User",
+          mode: "cycle",
+          cycleLength: "28",
+          periodLength: "5",
+        })
+      }
     }
 
-    const storedLogs = localStorage.getItem("flowfit-symptom-logs")
-    if (storedLogs) {
-      setSymptomLogs(JSON.parse(storedLogs))
-    }
+    loadData()
   }, [])
 
   const getPhaseForDay = (date: Date): CyclePhase | null => {

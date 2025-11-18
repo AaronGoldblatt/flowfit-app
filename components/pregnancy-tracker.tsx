@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Heart, Baby, AlertCircle, Play, Clock, Flame, BookOpen } from "lucide-react"
+import { getProfile } from "@/actions/profile"
 
 interface UserProfile {
   name: string
@@ -41,10 +42,23 @@ export function PregnancyTracker() {
   const [selectedWorkout, setSelectedWorkout] = useState<PregnancyWorkout | null>(null)
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("flowfit-profile")
-    if (storedProfile) {
-      setProfile(JSON.parse(storedProfile))
+    const loadProfile = async () => {
+      try {
+        const { data: profileData } = await getProfile()
+        if (profileData) {
+          setProfile({
+            name: profileData.name,
+            trimester: profileData.trimester || "first",
+            mode: profileData.mode as "cycle" | "pregnancy",
+          })
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error)
+        setProfile({ name: "User", trimester: "first", mode: "pregnancy" })
+      }
     }
+
+    loadProfile()
   }, [])
 
   const trimesterInfo: Record<string, TrimesterInfo> = {

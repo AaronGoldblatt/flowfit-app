@@ -9,6 +9,8 @@ import { Play, Clock, Flame, Moon, Sun, Sparkles, Heart, BookOpen } from "lucide
 import { differenceInDays } from "date-fns"
 import { WorkoutDetailModal } from "@/components/workout-detail-modal"
 import { EducationModal } from "@/components/education-modal"
+import { getProfile } from "@/actions/profile"
+import { getCurrentCycle } from "@/actions/cycles"
 
 interface UserProfile {
   name: string
@@ -43,44 +45,96 @@ export function HomeDashboard() {
   const [showWorkoutModal, setShowWorkoutModal] = useState(false)
   const [showEducationModal, setShowEducationModal] = useState(false)
   const [completedWorkouts, setCompletedWorkouts] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("flowfit-profile")
-    if (storedProfile) {
-      const parsedProfile = JSON.parse(storedProfile)
-      setProfile(parsedProfile)
+    const loadProfile = async () => {
+      try {
+        setIsLoading(true)
+        // Add timeout to prevent hanging indefinitely
+        const profilePromise = getProfile()
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+        )
+        
+        const { data: profileData } = await Promise.race([profilePromise, timeoutPromise]) as any
+        if (profileData) {
+          const parsedProfile = {
+            name: profileData.name,
+            age: profileData.age?.toString() || "",
+            fitnessLevel: profileData.fitnessLevel || "",
+            goals: profileData.goals || [],
+            mode: profileData.mode as "cycle" | "pregnancy",
+            trimester: profileData.trimester || undefined,
+            cycleLength: "28",
+            periodLength: "5",
+          }
+          setProfile(parsedProfile)
 
-      // Calculate cycle phase
-      if (parsedProfile.mode === "cycle" && parsedProfile.lastPeriodDate) {
-        const lastPeriod = new Date(parsedProfile.lastPeriodDate)
-        const today = new Date()
-        const daysSinceLastPeriod = differenceInDays(today, lastPeriod)
-        const cycleLength = Number.parseInt(parsedProfile.cycleLength)
-        const periodLength = Number.parseInt(parsedProfile.periodLength)
+          // If cycle mode, try to get cycle data
+          if (profileData.mode === "cycle") {
+            const { data: cycleData } = await getCurrentCycle()
+            if (cycleData && cycleData.lastPeriodDate) {
+              const lastPeriod = new Date(cycleData.lastPeriodDate)
+              const today = new Date()
+              const daysSinceLastPeriod = differenceInDays(today, lastPeriod)
+              const cycleLength = cycleData.cycleLength || 28
+              const periodLength = cycleData.periodLength || 5
 
-        const currentDay = (daysSinceLastPeriod % cycleLength) + 1
-        setDayInCycle(currentDay)
+              const currentDay = (daysSinceLastPeriod % cycleLength) + 1
+              setDayInCycle(currentDay)
 
-        // Determine phase
-        if (currentDay <= periodLength) {
-          setCurrentPhase("menstrual")
-        } else if (currentDay <= 13) {
-          setCurrentPhase("follicular")
-        } else if (currentDay <= 16) {
-          setCurrentPhase("ovulation")
+              // Determine phase
+              if (currentDay <= periodLength) {
+                setCurrentPhase("menstrual")
+              } else if (currentDay <= 13) {
+                setCurrentPhase("follicular")
+              } else if (currentDay <= 16) {
+                setCurrentPhase("ovulation")
+              } else {
+                setCurrentPhase("luteal")
+              }
+            }
+          }
+
+          // Generate recommended workouts
+          generateWorkouts(parsedProfile)
         } else {
-          setCurrentPhase("luteal")
+          // No profile found, use fallback
+          const fallbackProfile = {
+            name: "User",
+            age: "",
+            fitnessLevel: "intermediate",
+            goals: [],
+            mode: "pregnancy" as "cycle" | "pregnancy",
+            trimester: "first",
+            cycleLength: "28",
+            periodLength: "5",
+          }
+          setProfile(fallbackProfile)
+          generateWorkouts(fallbackProfile)
         }
+      } catch (error) {
+        console.error("Error loading profile:", error)
+        // Use fallback on error
+        const fallbackProfile = {
+          name: "User",
+          age: "",
+          fitnessLevel: "intermediate",
+          goals: [],
+          mode: "pregnancy" as "cycle" | "pregnancy",
+          trimester: "first",
+          cycleLength: "28",
+          periodLength: "5",
+        }
+        setProfile(fallbackProfile)
+        generateWorkouts(fallbackProfile)
+      } finally {
+        setIsLoading(false)
       }
-
-      // Generate recommended workouts
-      generateWorkouts(parsedProfile)
     }
 
-    const stored = localStorage.getItem("flowfit-completed-workouts")
-    if (stored) {
-      setCompletedWorkouts(JSON.parse(stored))
-    }
+    loadProfile()
   }, [])
 
   const generateWorkouts = (userProfile: UserProfile) => {
