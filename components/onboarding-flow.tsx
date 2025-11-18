@@ -54,9 +54,42 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     }))
   }
 
-  const handleComplete = () => {
-    localStorage.setItem("flowfit-profile", JSON.stringify(profile))
-    onComplete()
+  const handleComplete = async () => {
+    try {
+      // Import the createProfile and upsertCycle actions
+      const { createProfile } = await import("@/actions/profile")
+      const { upsertCycle } = await import("@/actions/cycles")
+
+      // Create profile
+      const profileResult = await createProfile({
+        name: profile.name,
+        age: profile.age ? Number.parseInt(profile.age) : undefined,
+        fitnessLevel: profile.fitnessLevel as "beginner" | "intermediate" | "advanced",
+        goals: profile.goals,
+        mode: profile.mode,
+        trimester: profile.trimester as "first" | "second" | "third" | undefined,
+      })
+
+      if (profileResult.error) {
+        console.error("Profile creation error:", profileResult.error)
+        alert("Error creating profile. Please try again.")
+        return
+      }
+
+      // If cycle mode and lastPeriodDate exists, create cycle data
+      if (profile.mode === "cycle" && profile.lastPeriodDate) {
+        await upsertCycle({
+          lastPeriodDate: profile.lastPeriodDate.toISOString().split('T')[0],
+          cycleLength: Number.parseInt(profile.cycleLength),
+          periodLength: Number.parseInt(profile.periodLength),
+        })
+      }
+
+      onComplete()
+    } catch (error) {
+      console.error("Onboarding completion error:", error)
+      alert("An error occurred. Please try again.")
+    }
   }
 
   if (step === "welcome") {
