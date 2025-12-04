@@ -45,13 +45,13 @@ export const symptomLogs = pgTable("symptom_logs", {
 
 // Validation schemas
 export const insertCycleSchema = createInsertSchema(cycles, {
-  lastPeriodDate: z.string().transform((val) => new Date(val)),
+  lastPeriodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
   cycleLength: z.number().int().min(21).max(35).default(28),
   periodLength: z.number().int().min(2).max(10).default(5),
 });
 
 export const insertSymptomLogSchema = createInsertSchema(symptomLogs, {
-  date: z.string().transform((val) => new Date(val)),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
   symptoms: z.array(z.string()).default([]),
   mood: z.string().optional(),
   notes: z.string().optional(),

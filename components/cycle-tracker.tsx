@@ -9,11 +9,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Droplets, Moon, Sparkles, Sun, Plus, TrendingUp } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Droplets, Moon, Sparkles, Sun, Plus, TrendingUp, Settings, CalendarIcon } from "lucide-react"
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns"
 import { getProfile } from "@/actions/profile"
-import { getCurrentCycle } from "@/actions/cycles"
-import { getPhaseForDate, type CyclePhase } from "@/lib/cycle-utils"
+import { getCurrentCycle, upsertCycle } from "@/actions/cycles"
+import { getPhaseForDate, parseLocalDate, type CyclePhase } from "@/lib/cycle-utils"
+import { cn } from "@/lib/utils"
 
 interface UserProfile {
   name: string
@@ -36,45 +40,59 @@ export function CycleTracker() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [symptomLogs, setSymptomLogs] = useState<SymptomLog[]>([])
   const [isLoggingSymptoms, setIsLoggingSymptoms] = useState(false)
+  const [isEditingCycle, setIsEditingCycle] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [currentLog, setCurrentLog] = useState<SymptomLog>({
     date: format(new Date(), "yyyy-MM-dd"),
     symptoms: [],
     notes: "",
     mood: "",
   })
+  
+  // Edit cycle state
+  const [editLastPeriodDate, setEditLastPeriodDate] = useState<Date | undefined>(undefined)
+  const [editCycleLength, setEditCycleLength] = useState("28")
+  const [editPeriodLength, setEditPeriodLength] = useState("5")
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const { data: profileData } = await getProfile()
-        if (profileData) {
-          const parsedProfile: UserProfile = {
-            name: profileData.name,
-            mode: profileData.mode as "cycle" | "pregnancy",
-            cycleLength: "28",
-            periodLength: "5",
-          }
-          
-          const { data: cycleData } = await getCurrentCycle()
-          if (cycleData) {
-            parsedProfile.lastPeriodDate = cycleData.lastPeriodDate || undefined
-            parsedProfile.cycleLength = cycleData.cycleLength?.toString() || "28"
-            parsedProfile.periodLength = cycleData.periodLength?.toString() || "5"
-          }
-          
-          setProfile(parsedProfile)
-        }
-      } catch (error) {
-        console.error("Error loading cycle data:", error)
-        setProfile({
-          name: "User",
-          mode: "cycle",
+  const loadData = async () => {
+    try {
+      const { data: profileData } = await getProfile()
+      if (profileData) {
+        const parsedProfile: UserProfile = {
+          name: profileData.name,
+          mode: profileData.mode as "cycle" | "pregnancy",
           cycleLength: "28",
           periodLength: "5",
-        })
+        }
+        
+        const { data: cycleData } = await getCurrentCycle()
+        if (cycleData) {
+          parsedProfile.lastPeriodDate = cycleData.lastPeriodDate || undefined
+          parsedProfile.cycleLength = cycleData.cycleLength?.toString() || "28"
+          parsedProfile.periodLength = cycleData.periodLength?.toString() || "5"
+          
+          console.log("Loaded cycle data from DB:", {
+            lastPeriodDate: cycleData.lastPeriodDate,
+            cycleLength: cycleData.cycleLength,
+            periodLength: cycleData.periodLength
+          })
+        }
+        
+        setProfile(parsedProfile)
+        console.log("Updated profile state:", parsedProfile)
       }
+    } catch (error) {
+      console.error("Error loading cycle data:", error)
+      setProfile({
+        name: "User",
+        mode: "cycle",
+        cycleLength: "28",
+        periodLength: "5",
+      })
     }
+  }
 
+  useEffect(() => {
     loadData()
   }, [])
 
@@ -196,8 +214,92 @@ export function CycleTracker() {
     setIsLoggingSymptoms(true)
   }
 
+  const handleMarkPeriodStart = async (date: Date) => {
+    // Format the date for display
+    const displayDate = format(date, "MMMM d, yyyy")
+    const localDateString = format(date, 'yyyy-MM-dd')
+    
+    console.log("Marking period start:")
+    console.log("  Date object:", date)
+    console.log("  Display date:", displayDate)
+    console.log("  Saving as:", localDateString)
+    
+    const confirmed = window.confirm(
+      `Mark ${displayDate} as the start of your period?\n\nThis will update your cycle tracking from this date forward.`
+    )
+    
+    if (!confirmed) return
+
+    setIsSaving(true)
+    try {
+      const result = await upsertCycle({
+        lastPeriodDate: localDateString,
+        cycleLength: Number.parseInt(profile?.cycleLength || "28"),
+        periodLength: Number.parseInt(profile?.periodLength || "5"),
+      })
+
+      if (result.error) {
+        alert(`Error: ${result.error}`)
+      } else {
+        console.log("Period start saved successfully, reloading data...")
+        // Reload cycle data from server to get fresh calculations
+        await loadData()
+        console.log("Profile after reload:", profile)
+      }
+    } catch (error) {
+      console.error("Error marking period start:", error)
+      alert("Failed to mark period start")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const getLogForDate = (date: Date): SymptomLog | undefined => {
     return symptomLogs.find((log) => log.date === format(date, "yyyy-MM-dd"))
+  }
+
+  const openEditCycleDialog = () => {
+    // Pre-fill with current values
+    if (profile?.lastPeriodDate) {
+      // Parse as local date to avoid timezone issues
+      setEditLastPeriodDate(parseLocalDate(profile.lastPeriodDate))
+    }
+    setEditCycleLength(profile?.cycleLength || "28")
+    setEditPeriodLength(profile?.periodLength || "5")
+    setIsEditingCycle(true)
+  }
+
+  const handleSaveCycleInfo = async () => {
+    if (!editLastPeriodDate) {
+      alert("Please select your last period date")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Use format to preserve local date instead of UTC conversion
+      const localDateString = format(editLastPeriodDate, 'yyyy-MM-dd')
+      
+      const result = await upsertCycle({
+        lastPeriodDate: localDateString,
+        cycleLength: Number.parseInt(editCycleLength),
+        periodLength: Number.parseInt(editPeriodLength),
+      })
+
+      if (result.error) {
+        alert(`Error: ${result.error}`)
+      } else {
+        setIsEditingCycle(false)
+        
+        // Reload cycle data from server to get fresh calculations
+        await loadData()
+      }
+    } catch (error) {
+      console.error("Error saving cycle info:", error)
+      alert("Failed to save cycle information")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   if (!profile || profile.mode === "pregnancy") {
@@ -266,8 +368,20 @@ export function CycleTracker() {
           {/* Calendar */}
           <Card className="border-pink-200">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{format(currentMonth, "MMMM yyyy")}</CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center justify-between sm:justify-start gap-3">
+                  <CardTitle>{format(currentMonth, "MMMM yyyy")}</CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={openEditCycleDialog}
+                    className="flex items-center gap-2"
+                    title="Edit cycle settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span className="hidden sm:inline">Edit Cycle</span>
+                  </Button>
+                </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => setCurrentMonth(addDays(currentMonth, -30))}>
                     Previous
@@ -300,55 +414,106 @@ export function CycleTracker() {
                   const phase = getPhaseForDay(day)
                   const log = getLogForDate(day)
                   const isToday = isSameDay(day, today)
+                  // Compare date strings directly to avoid timezone issues
+                  const dayString = format(day, 'yyyy-MM-dd')
+                  const isPeriodStart = profile?.lastPeriodDate && dayString === profile.lastPeriodDate
+                  
+                  // Debug logging for the marked day
+                  if (isPeriodStart) {
+                    console.log("Period start marker:", { dayString, savedDate: profile.lastPeriodDate, matches: true })
+                  }
 
                   return (
-                    <button
-                      key={day.toISOString()}
-                      onClick={() => openLogDialog(day)}
-                      className={`aspect-square p-2 rounded-lg border-2 transition-all hover:scale-105 cursor-pointer ${getPhaseColor(phase)} ${
-                        isToday ? "ring-2 ring-pink-500 ring-offset-2" : ""
-                      }`}
-                    >
-                      <div className="flex flex-col items-center justify-center h-full">
-                        <span className="text-sm font-semibold">{format(day, "d")}</span>
-                        {phase && <div className="mt-1">{getPhaseIcon(phase)}</div>}
-                        {log && log.symptoms.length > 0 && (
-                          <div className="mt-1 w-2 h-2 rounded-full bg-pink-600 border border-pink-800" />
-                        )}
-                      </div>
-                    </button>
+                    <div key={day.toISOString()} className="relative group">
+                      <button
+                        onClick={() => openLogDialog(day)}
+                        className={`w-full aspect-square p-2 rounded-lg border-2 transition-all hover:scale-105 cursor-pointer ${getPhaseColor(phase)} ${
+                          isToday ? "ring-2 ring-pink-500 ring-offset-2" : ""
+                        } ${isPeriodStart ? "ring-2 ring-red-500" : ""}`}
+                      >
+                        <div className="flex flex-col items-center justify-center h-full">
+                          <span className="text-sm font-semibold">{format(day, "d")}</span>
+                          {phase && <div className="mt-1">{getPhaseIcon(phase)}</div>}
+                          {log && log.symptoms.length > 0 && (
+                            <div className="mt-1 w-2 h-2 rounded-full bg-pink-600 border border-pink-800" />
+                          )}
+                          {isPeriodStart && (
+                            <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-600 border border-red-800" title="Period start" />
+                          )}
+                        </div>
+                      </button>
+                      
+                      {/* Quick action button - only show on hover */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleMarkPeriodStart(day)
+                        }}
+                        className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg hover:bg-red-600 whitespace-nowrap z-10"
+                        title="Mark period start"
+                      >
+                        📅 Period
+                      </button>
+                    </div>
                   )
                 })}
               </div>
 
               {/* Legend */}
-              <div className="mt-6 pt-6 border-t border-pink-200">
-                <p className="text-sm font-medium mb-3">Phase Legend:</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-300 flex items-center justify-center">
-                      <Droplets className="h-3 w-3 text-red-700" />
+              <div className="mt-6 pt-6 border-t border-pink-200 space-y-4">
+                <div>
+                  <p className="text-sm font-medium mb-3">Phase Legend:</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-300 flex items-center justify-center">
+                        <Droplets className="h-3 w-3 text-red-700" />
+                      </div>
+                      <span className="text-sm">Menstrual</span>
                     </div>
-                    <span className="text-sm">Menstrual</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-green-100 border-2 border-green-300 flex items-center justify-center">
-                      <Sparkles className="h-3 w-3 text-green-700" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-green-100 border-2 border-green-300 flex items-center justify-center">
+                        <Sparkles className="h-3 w-3 text-green-700" />
+                      </div>
+                      <span className="text-sm">Follicular</span>
                     </div>
-                    <span className="text-sm">Follicular</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-yellow-100 border-2 border-yellow-300 flex items-center justify-center">
-                      <Sun className="h-3 w-3 text-yellow-700" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-yellow-100 border-2 border-yellow-300 flex items-center justify-center">
+                        <Sun className="h-3 w-3 text-yellow-700" />
+                      </div>
+                      <span className="text-sm">Ovulation</span>
                     </div>
-                    <span className="text-sm">Ovulation</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-300 flex items-center justify-center">
-                      <Moon className="h-3 w-3 text-purple-700" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-300 flex items-center justify-center">
+                        <Moon className="h-3 w-3 text-purple-700" />
+                      </div>
+                      <span className="text-sm">Luteal</span>
                     </div>
-                    <span className="text-sm">Luteal</span>
                   </div>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium mb-3">Markers:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border-2 border-gray-300 flex items-center justify-center relative">
+                        <div className="w-2 h-2 rounded-full bg-pink-600 border border-pink-800" />
+                      </div>
+                      <span className="text-sm">Has symptoms logged</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded border-2 border-red-500 flex items-center justify-center relative">
+                        <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-600 border border-red-800" />
+                      </div>
+                      <span className="text-sm">Period start date</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-900">
+                    <strong>💡 Tip:</strong> Hover over any date and click "📅 Period" to mark when your period actually starts. 
+                    This helps keep your cycle tracking accurate!
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -479,6 +644,116 @@ export function CycleTracker() {
               </Button>
               <Button onClick={handleSaveLog} className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500">
                 Save Log
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Cycle Info Dialog */}
+      <Dialog open={isEditingCycle} onOpenChange={setIsEditingCycle}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-pink-500" />
+              Edit Cycle Information
+            </DialogTitle>
+            <DialogDescription>
+              Update your cycle details to ensure accurate phase tracking
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label>Last Period Start Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !editLastPeriodDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editLastPeriodDate ? format(editLastPeriodDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={editLastPeriodDate}
+                    onSelect={setEditLastPeriodDate}
+                    initialFocus
+                    disabled={(date) => date > new Date()}
+                  />
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">
+                This is the first day of your most recent period
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-cycle-length">
+                  Cycle Length (days)
+                </Label>
+                <Input
+                  id="edit-cycle-length"
+                  type="number"
+                  min="21"
+                  max="45"
+                  value={editCycleLength}
+                  onChange={(e) => setEditCycleLength(e.target.value)}
+                  placeholder="28"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Usually 21-35 days
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-period-length">
+                  Period Length (days)
+                </Label>
+                <Input
+                  id="edit-period-length"
+                  type="number"
+                  min="2"
+                  max="10"
+                  value={editPeriodLength}
+                  onChange={(e) => setEditPeriodLength(e.target.value)}
+                  placeholder="5"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Usually 3-7 days
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
+              <p className="text-sm text-pink-900">
+                <strong>Tip:</strong> Your cycle phases will automatically update based on these settings. 
+                The calendar will recalculate to show accurate phase information.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditingCycle(false)} 
+                className="flex-1"
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveCycleInfo} 
+                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500"
+                disabled={isSaving}
+              >
+                {isSaving ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </div>
