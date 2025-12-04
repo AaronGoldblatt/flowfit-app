@@ -4,6 +4,33 @@
 
 export type CyclePhase = "menstrual" | "follicular" | "ovulation" | "luteal";
 
+/**
+ * Parse a date string (YYYY-MM-DD) into a Date object in local timezone
+ * This prevents timezone issues when comparing dates
+ */
+export function parseLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number);
+  // Month is 0-indexed in JavaScript Date
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * Get the start of day for a date in local timezone
+ */
+export function getLocalDateOnly(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/**
+ * Calculate days between two dates (date-only, ignoring time)
+ */
+export function daysBetweenDates(date1: Date, date2: Date): number {
+  const d1 = getLocalDateOnly(date1);
+  const d2 = getLocalDateOnly(date2);
+  const diffTime = d2.getTime() - d1.getTime();
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
 export interface CycleInfo {
   phase: CyclePhase;
   dayInCycle: number;
@@ -15,14 +42,18 @@ export interface CycleInfo {
  * Calculate the current cycle phase and day
  */
 export function calculateCycleInfo(
-  lastPeriodDate: Date,
+  lastPeriodDate: Date | string,
   cycleLength = 28,
-  periodLength = 5
+  periodLength = 5,
+  referenceDate?: Date
 ): CycleInfo {
-  const today = new Date();
-  const daysSinceLastPeriod = Math.floor(
-    (today.getTime() - lastPeriodDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  // Parse the date properly to avoid timezone issues
+  const lastPeriod = typeof lastPeriodDate === 'string' 
+    ? parseLocalDate(lastPeriodDate)
+    : getLocalDateOnly(lastPeriodDate);
+  
+  const today = referenceDate ? getLocalDateOnly(referenceDate) : getLocalDateOnly(new Date());
+  const daysSinceLastPeriod = daysBetweenDates(lastPeriod, today);
 
   // Calculate current day in cycle (1-based)
   const dayInCycle = (daysSinceLastPeriod % cycleLength) + 1;
@@ -154,5 +185,36 @@ export function predictOvulation(
   // Ovulation typically occurs 14 days before next period
   ovulation.setDate(ovulation.getDate() + cycleLength - 14);
   return ovulation;
+}
+
+/**
+ * Get the cycle phase for a specific date
+ * Used by the calendar to show phases for each day
+ */
+export function getPhaseForDate(
+  date: Date,
+  lastPeriodDate: Date | string,
+  cycleLength = 28,
+  periodLength = 5
+): CyclePhase | null {
+  // Parse the date properly to avoid timezone issues
+  const lastPeriod = typeof lastPeriodDate === 'string' 
+    ? parseLocalDate(lastPeriodDate)
+    : getLocalDateOnly(lastPeriodDate);
+  
+  const checkDate = getLocalDateOnly(date);
+  const daysSinceLastPeriod = daysBetweenDates(lastPeriod, checkDate);
+
+  // Don't show phases for dates before the last period
+  if (daysSinceLastPeriod < 0) return null;
+
+  // Calculate current day in cycle (1-based)
+  const dayInCycle = (daysSinceLastPeriod % cycleLength) + 1;
+
+  // Determine phase
+  if (dayInCycle <= periodLength) return "menstrual";
+  if (dayInCycle <= 13) return "follicular";
+  if (dayInCycle <= 16) return "ovulation";
+  return "luteal";
 }
 

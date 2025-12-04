@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Calendar, Target, Activity } from "lucide-react"
 import { getProfile } from "@/actions/profile"
 import { getCurrentCycle } from "@/actions/cycles"
+import { getWorkoutLogs } from "@/actions/workouts"
 import { getGoalLabel } from "@/lib/utils"
 
 interface UserProfile {
@@ -27,6 +28,11 @@ interface ProfileViewProps {
 
 export function ProfileView({ onEditProfile }: ProfileViewProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [workoutStats, setWorkoutStats] = useState({
+    totalWorkouts: 0,
+    totalMinutes: 0,
+    totalCalories: 0,
+  })
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -54,6 +60,15 @@ export function ProfileView({ onEditProfile }: ProfileViewProps) {
           }
           
           setProfile(parsedProfile)
+
+          // Fetch workout stats
+          const { data: workoutLogs } = await getWorkoutLogs(1000)
+          if (workoutLogs) {
+            const totalWorkouts = workoutLogs.length
+            const totalMinutes = workoutLogs.reduce((sum, log) => sum + (log.duration || 0), 0)
+            const totalCalories = workoutLogs.reduce((sum, log) => sum + (log.caloriesBurned || 0), 0)
+            setWorkoutStats({ totalWorkouts, totalMinutes, totalCalories })
+          }
         }
       } catch (error) {
         console.error("Error loading profile:", error)
@@ -152,15 +167,19 @@ export function ProfileView({ onEditProfile }: ProfileViewProps) {
         <CardContent className="space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Total Workouts</span>
-            <span className="font-medium text-lg">24</span>
+            <span className="font-medium text-lg">{workoutStats.totalWorkouts}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Total Time</span>
-            <span className="font-medium text-lg">12.5 hours</span>
+            <span className="font-medium text-lg">
+              {workoutStats.totalMinutes === 0 
+                ? "0 hours" 
+                : (workoutStats.totalMinutes / 60).toFixed(1) + " hours"}
+            </span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Calories Burned</span>
-            <span className="font-medium text-lg">4,850</span>
+            <span className="font-medium text-lg">{workoutStats.totalCalories.toLocaleString()}</span>
           </div>
         </CardContent>
       </Card>

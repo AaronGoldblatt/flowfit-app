@@ -10,6 +10,7 @@ import { ProgressView } from "@/components/progress-view"
 import { ProfileView } from "@/components/profile-view"
 import { HamburgerMenu } from "@/components/hamburger-menu"
 import { EditProfileModal } from "@/components/edit-profile-modal"
+import { getProfile } from "@/actions/profile"
 
 export function MainApp() {
   const [activeTab, setActiveTab] = useState<"home" | "cycle" | "progress" | "profile">("home")
@@ -17,11 +18,17 @@ export function MainApp() {
   const [showEditProfile, setShowEditProfile] = useState(false)
 
   useEffect(() => {
-    const storedProfile = localStorage.getItem("flowfit-profile")
-    if (storedProfile) {
-      const profile = JSON.parse(storedProfile)
-      setIsPregnancyMode(profile.mode === "pregnancy")
+    const loadProfileMode = async () => {
+      try {
+        const { data: profileData } = await getProfile()
+        if (profileData) {
+          setIsPregnancyMode(profileData.mode === "pregnancy")
+        }
+      } catch (error) {
+        console.error("Error loading profile mode:", error)
+      }
     }
+    loadProfileMode()
   }, [])
 
   return (

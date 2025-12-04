@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Play, Clock, Flame, Moon, Sun, Sparkles, Heart, BookOpen } from "lucide-react"
-import { differenceInDays } from "date-fns"
 import { WorkoutDetailModal } from "@/components/workout-detail-modal"
 import { EducationModal } from "@/components/education-modal"
 import { getProfile } from "@/actions/profile"
 import { getCurrentCycle } from "@/actions/cycles"
+import { getWorkoutStats } from "@/actions/workouts"
+import { calculateCycleInfo, type CyclePhase } from "@/lib/cycle-utils"
 
 interface UserProfile {
   name: string
@@ -23,8 +24,6 @@ interface UserProfile {
   mode: "cycle" | "pregnancy"
   trimester?: string
 }
-
-type CyclePhase = "menstrual" | "follicular" | "ovulation" | "luteal"
 
 interface Workout {
   id: string
@@ -46,6 +45,12 @@ export function HomeDashboard() {
   const [showEducationModal, setShowEducationModal] = useState(false)
   const [completedWorkouts, setCompletedWorkouts] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [workoutStats, setWorkoutStats] = useState({
+    totalWorkouts: 0,
+    totalCalories: 0,
+    totalDuration: 0,
+    streak: 0,
+  })
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -71,34 +76,40 @@ export function HomeDashboard() {
           }
           setProfile(parsedProfile)
 
+          let calculatedPhase: CyclePhase = "follicular"
+          
           // If cycle mode, try to get cycle data
           if (profileData.mode === "cycle") {
             const { data: cycleData } = await getCurrentCycle()
             if (cycleData && cycleData.lastPeriodDate) {
-              const lastPeriod = new Date(cycleData.lastPeriodDate)
-              const today = new Date()
-              const daysSinceLastPeriod = differenceInDays(today, lastPeriod)
               const cycleLength = cycleData.cycleLength || 28
               const periodLength = cycleData.periodLength || 5
 
-              const currentDay = (daysSinceLastPeriod % cycleLength) + 1
-              setDayInCycle(currentDay)
-
-              // Determine phase
-              if (currentDay <= periodLength) {
-                setCurrentPhase("menstrual")
-              } else if (currentDay <= 13) {
-                setCurrentPhase("follicular")
-              } else if (currentDay <= 16) {
-                setCurrentPhase("ovulation")
-              } else {
-                setCurrentPhase("luteal")
-              }
+              // Use the utility function for proper date handling
+              const cycleInfo = calculateCycleInfo(
+                cycleData.lastPeriodDate,
+                cycleLength,
+                periodLength
+              )
+              
+              calculatedPhase = cycleInfo.phase
+              setDayInCycle(cycleInfo.dayInCycle)
+              setCurrentPhase(calculatedPhase)
             }
           }
 
-          // Generate recommended workouts
-          generateWorkouts(parsedProfile)
+          // Generate recommended workouts using the calculated phase
+          if (parsedProfile.mode === "pregnancy") {
+            setRecommendedWorkouts(getPregnancyWorkouts(parsedProfile.trimester || "first", parsedProfile.fitnessLevel))
+          } else {
+            setRecommendedWorkouts(getCycleWorkouts(calculatedPhase, parsedProfile.fitnessLevel))
+          }
+
+          // Fetch workout stats
+          const { data: stats } = await getWorkoutStats(7)
+          if (stats) {
+            setWorkoutStats(stats)
+          }
         } else {
           // No profile found, use fallback
           const fallbackProfile = {
@@ -112,7 +123,7 @@ export function HomeDashboard() {
             periodLength: "5",
           }
           setProfile(fallbackProfile)
-          generateWorkouts(fallbackProfile)
+          setRecommendedWorkouts(getPregnancyWorkouts("first", "intermediate"))
         }
       } catch (error) {
         console.error("Error loading profile:", error)
@@ -128,7 +139,7 @@ export function HomeDashboard() {
           periodLength: "5",
         }
         setProfile(fallbackProfile)
-        generateWorkouts(fallbackProfile)
+        setRecommendedWorkouts(getPregnancyWorkouts("first", "intermediate"))
       } finally {
         setIsLoading(false)
       }
@@ -137,13 +148,6 @@ export function HomeDashboard() {
     loadProfile()
   }, [])
 
-  const generateWorkouts = (userProfile: UserProfile) => {
-    if (userProfile.mode === "pregnancy") {
-      setRecommendedWorkouts(getPregnancyWorkouts(userProfile.trimester || "first", userProfile.fitnessLevel))
-    } else {
-      setRecommendedWorkouts(getCycleWorkouts(currentPhase, userProfile.fitnessLevel))
-    }
-  }
 
   const getPhaseInfo = (phase: CyclePhase) => {
     const phaseData = {
@@ -546,17 +550,25 @@ export function HomeDashboard() {
         <Card className="border-indigo-500/30 bg-slate-900/80 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <CardDescription className="text-slate-400">This Week</CardDescription>
-            <CardTitle className="text-3xl text-slate-100">4 workouts</CardTitle>
+            <CardTitle className="text-3xl text-slate-100">
+              {workoutStats.totalWorkouts} {workoutStats.totalWorkouts === 1 ? 'workout' : 'workouts'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-slate-400">Great consistency!</p>
+            <p className="text-sm text-slate-400">
+              {workoutStats.totalWorkouts === 0 
+                ? "Start your first workout!" 
+                : workoutStats.totalWorkouts >= 4 
+                  ? "Great consistency!" 
+                  : "Keep going!"}
+            </p>
           </CardContent>
         </Card>
 
         <Card className="border-indigo-500/30 bg-slate-900/80 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <CardDescription className="text-slate-400">Total Calories</CardDescription>
-            <CardTitle className="text-3xl text-slate-100">1,240</CardTitle>
+            <CardTitle className="text-3xl text-slate-100">{workoutStats.totalCalories.toLocaleString()}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-slate-400">Burned this week</p>
@@ -566,10 +578,14 @@ export function HomeDashboard() {
         <Card className="border-indigo-500/30 bg-slate-900/80 backdrop-blur-sm">
           <CardHeader className="pb-3">
             <CardDescription className="text-slate-400">Current Streak</CardDescription>
-            <CardTitle className="text-3xl text-slate-100">7 days 🔥</CardTitle>
+            <CardTitle className="text-3xl text-slate-100">
+              {workoutStats.streak} {workoutStats.streak === 1 ? 'day' : 'days'} {workoutStats.streak > 0 ? '🔥' : ''}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-slate-400">Keep it up!</p>
+            <p className="text-sm text-slate-400">
+              {workoutStats.streak === 0 ? "Start your streak today!" : "Keep it up!"}
+            </p>
           </CardContent>
         </Card>
       </div>

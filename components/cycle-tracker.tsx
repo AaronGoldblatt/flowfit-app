@@ -10,9 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Droplets, Moon, Sparkles, Sun, Plus, TrendingUp } from "lucide-react"
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, differenceInDays } from "date-fns"
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns"
 import { getProfile } from "@/actions/profile"
 import { getCurrentCycle } from "@/actions/cycles"
+import { getPhaseForDate, type CyclePhase } from "@/lib/cycle-utils"
 
 interface UserProfile {
   name: string
@@ -28,8 +29,6 @@ interface SymptomLog {
   notes: string
   mood: string
 }
-
-type CyclePhase = "menstrual" | "follicular" | "ovulation" | "luteal"
 
 export function CycleTracker() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -82,19 +81,12 @@ export function CycleTracker() {
   const getPhaseForDay = (date: Date): CyclePhase | null => {
     if (!profile?.lastPeriodDate) return null
 
-    const lastPeriod = new Date(profile.lastPeriodDate)
-    const daysSinceLastPeriod = differenceInDays(date, lastPeriod)
-    const cycleLength = Number.parseInt(profile.cycleLength)
-    const periodLength = Number.parseInt(profile.periodLength)
-
-    if (daysSinceLastPeriod < 0) return null
-
-    const currentDay = (daysSinceLastPeriod % cycleLength) + 1
-
-    if (currentDay <= periodLength) return "menstrual"
-    if (currentDay <= 13) return "follicular"
-    if (currentDay <= 16) return "ovulation"
-    return "luteal"
+    return getPhaseForDate(
+      date,
+      profile.lastPeriodDate,
+      Number.parseInt(profile.cycleLength),
+      Number.parseInt(profile.periodLength)
+    )
   }
 
   const getPhaseColor = (phase: CyclePhase | null): string => {

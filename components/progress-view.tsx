@@ -8,6 +8,7 @@ import { TrendingUp, Flame, Clock, Target, Award, CalendarIcon, Activity } from 
 import { Bar, BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { getProfile } from "@/actions/profile"
+import { getWorkoutLogs } from "@/actions/workouts"
 
 interface WorkoutLog {
   date: string
@@ -44,46 +45,49 @@ export function ProgressView() {
             goals: profileData.goals || [],
           })
         }
+
+        // Fetch real workout logs from database
+        const { data: workoutLogsData } = await getWorkoutLogs(30)
+        if (workoutLogsData) {
+          // Transform database workout logs to match the expected format
+          const transformedLogs: WorkoutLog[] = workoutLogsData.map((log) => ({
+            date: log.date,
+            workoutTitle: log.workoutType || "Workout",
+            duration: log.duration || 0,
+            calories: log.caloriesBurned || 0,
+            intensity: log.intensity || "medium",
+          }))
+          setWorkoutLogs(transformedLogs)
+          calculateStats(transformedLogs)
+        } else {
+          // No workout logs yet - set empty arrays and zero stats
+          setWorkoutLogs([])
+          setStats({
+            totalWorkouts: 0,
+            totalMinutes: 0,
+            totalCalories: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            averagePerWeek: 0,
+          })
+        }
       } catch (error) {
-        console.error("Error loading profile:", error)
+        console.error("Error loading data:", error)
         setProfile({ name: "User", goals: [] })
-      }
-
-      // Generate sample workout data for demonstration
-      const sampleLogs = generateSampleWorkoutLogs()
-      setWorkoutLogs(sampleLogs)
-
-      // Calculate stats
-      calculateStats(sampleLogs)
-    }
-
-    loadData()
-  }, [])
-
-  const generateSampleWorkoutLogs = (): WorkoutLog[] => {
-    const logs: WorkoutLog[] = []
-    const workoutTitles = ["HIIT Cardio", "Strength Training", "Yoga Flow", "Walking", "Pilates", "Swimming", "Cycling"]
-    const intensities = ["low", "medium", "high"]
-
-    // Generate logs for the past 30 days
-    for (let i = 0; i < 30; i++) {
-      // Random chance of workout on each day (70% chance)
-      if (Math.random() > 0.3) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-
-        logs.push({
-          date: date.toISOString().split("T")[0],
-          workoutTitle: workoutTitles[Math.floor(Math.random() * workoutTitles.length)],
-          duration: 20 + Math.floor(Math.random() * 40), // 20-60 minutes
-          calories: 100 + Math.floor(Math.random() * 300), // 100-400 calories
-          intensity: intensities[Math.floor(Math.random() * intensities.length)],
+        setWorkoutLogs([])
+        setStats({
+          totalWorkouts: 0,
+          totalMinutes: 0,
+          totalCalories: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          averagePerWeek: 0,
         })
       }
     }
 
-    return logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }
+    loadData()
+  }, [])
 
   const calculateStats = (logs: WorkoutLog[]) => {
     const totalWorkouts = logs.length
