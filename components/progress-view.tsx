@@ -9,6 +9,7 @@ import { Bar, BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, Responsive
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { getProfile } from "@/actions/profile"
 import { getWorkoutLogs } from "@/actions/workouts"
+import { getGoalLabel } from "@/lib/utils"
 
 interface WorkoutLog {
   date: string
@@ -398,27 +399,55 @@ export function ProgressView() {
               <CardDescription>Track progress towards your fitness goals</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {profile.goals.map((goal) => {
-                  // Simulate progress for each goal
-                  const progress = 45 + Math.floor(Math.random() * 40)
-
-                  return (
+              {profile.goals.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">
+                  No goals set yet. Update your profile to add fitness goals!
+                </p>
+              ) : stats.totalWorkouts === 0 ? (
+                <div className="space-y-4">
+                  {profile.goals.map((goal) => (
                     <div key={goal} className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium capitalize">{goal}</span>
-                        <span className="text-sm text-muted-foreground">{progress}%</span>
+                        <span className="font-medium">{getGoalLabel(goal)}</span>
+                        <span className="text-sm text-muted-foreground">0%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="h-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all"
-                          style={{ width: `${progress}%` }}
+                          style={{ width: '0%' }}
                         />
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                  <p className="text-sm text-center text-muted-foreground pt-2">
+                    Complete workouts to start tracking your progress!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {profile.goals.map((goal) => {
+                    // Calculate real progress based on workouts completed
+                    // For now, use a simple formula: (totalWorkouts / 30) * 100, capped at 100%
+                    // This assumes 30 workouts as a milestone for achieving goals
+                    const progress = Math.min(Math.round((stats.totalWorkouts / 30) * 100), 100)
+
+                    return (
+                      <div key={goal} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{getGoalLabel(goal)}</span>
+                          <span className="text-sm text-muted-foreground">{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
