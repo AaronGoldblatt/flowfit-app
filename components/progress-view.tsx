@@ -519,28 +519,56 @@ export function ProgressView() {
               <CardDescription>Milestones you've reached</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="p-4 border-2 border-yellow-200 bg-yellow-50 rounded-lg">
-                  <div className="text-3xl mb-2">🏆</div>
-                  <h4 className="font-semibold">First Workout</h4>
-                  <p className="text-sm text-muted-foreground">Completed your first workout</p>
+              {stats.totalWorkouts === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  Complete workouts to unlock achievements! 🏆
+                </p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* First Workout - Show if completed at least 1 */}
+                  {stats.totalWorkouts >= 1 && (
+                    <div className="p-4 border-2 border-yellow-200 bg-yellow-50 rounded-lg">
+                      <div className="text-3xl mb-2">🏆</div>
+                      <h4 className="font-semibold">First Workout</h4>
+                      <p className="text-sm text-muted-foreground">Completed your first workout</p>
+                    </div>
+                  )}
+                  
+                  {/* 7 Day Streak - Show if current streak is 7+ days */}
+                  {stats.currentStreak >= 7 && (
+                    <div className="p-4 border-2 border-pink-200 bg-pink-50 rounded-lg">
+                      <div className="text-3xl mb-2">🔥</div>
+                      <h4 className="font-semibold">7 Day Streak</h4>
+                      <p className="text-sm text-muted-foreground">Worked out 7 days in a row</p>
+                    </div>
+                  )}
+                  
+                  {/* 10 Workouts - Show if completed 10+ total */}
+                  {stats.totalWorkouts >= 10 && (
+                    <div className="p-4 border-2 border-purple-200 bg-purple-50 rounded-lg">
+                      <div className="text-3xl mb-2">💪</div>
+                      <h4 className="font-semibold">10 Workouts</h4>
+                      <p className="text-sm text-muted-foreground">Completed 10 total workouts</p>
+                    </div>
+                  )}
+                  
+                  {/* 1000 Calories - Show if burned 1000+ calories total */}
+                  {stats.totalCalories >= 1000 && (
+                    <div className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg">
+                      <div className="text-3xl mb-2">⚡</div>
+                      <h4 className="font-semibold">1000 Calories</h4>
+                      <p className="text-sm text-muted-foreground">Burned 1000+ calories</p>
+                    </div>
+                  )}
+                  
+                  {/* Show message if only first workout is unlocked */}
+                  {stats.totalWorkouts >= 1 && stats.totalWorkouts < 10 && stats.currentStreak < 7 && stats.totalCalories < 1000 && (
+                    <div className="col-span-full text-center text-muted-foreground text-sm py-2">
+                      Keep going to unlock more achievements! 💫
+                    </div>
+                  )}
                 </div>
-                <div className="p-4 border-2 border-pink-200 bg-pink-50 rounded-lg">
-                  <div className="text-3xl mb-2">🔥</div>
-                  <h4 className="font-semibold">7 Day Streak</h4>
-                  <p className="text-sm text-muted-foreground">Worked out 7 days in a row</p>
-                </div>
-                <div className="p-4 border-2 border-purple-200 bg-purple-50 rounded-lg">
-                  <div className="text-3xl mb-2">💪</div>
-                  <h4 className="font-semibold">10 Workouts</h4>
-                  <p className="text-sm text-muted-foreground">Completed 10 total workouts</p>
-                </div>
-                <div className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg">
-                  <div className="text-3xl mb-2">⚡</div>
-                  <h4 className="font-semibold">1000 Calories</h4>
-                  <p className="text-sm text-muted-foreground">Burned 1000+ calories</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
