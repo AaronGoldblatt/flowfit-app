@@ -33,6 +33,7 @@ yarn-error.log*
 .env
 .env*.local
 .env.production
+DEPLOYMENT_SECRETS.md
 
 # vercel
 .vercel
