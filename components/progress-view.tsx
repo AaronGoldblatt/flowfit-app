@@ -8,6 +8,8 @@ import { TrendingUp, Flame, Clock, Target, Award, CalendarIcon, Activity } from 
 import { Bar, BarChart, Line, LineChart, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { getProfile } from "@/actions/profile"
+import { getWorkoutLogs } from "@/actions/workouts"
+import { getGoalLabel } from "@/lib/utils"
 
 interface WorkoutLog {
   date: string
@@ -44,46 +46,49 @@ export function ProgressView() {
             goals: profileData.goals || [],
           })
         }
+
+        // Fetch real workout logs from database
+        const { data: workoutLogsData } = await getWorkoutLogs(30)
+        if (workoutLogsData) {
+          // Transform database workout logs to match the expected format
+          const transformedLogs: WorkoutLog[] = workoutLogsData.map((log) => ({
+            date: log.date,
+            workoutTitle: log.workoutType || "Workout",
+            duration: log.duration || 0,
+            calories: log.caloriesBurned || 0,
+            intensity: log.intensity || "medium",
+          }))
+          setWorkoutLogs(transformedLogs)
+          calculateStats(transformedLogs)
+        } else {
+          // No workout logs yet - set empty arrays and zero stats
+          setWorkoutLogs([])
+          setStats({
+            totalWorkouts: 0,
+            totalMinutes: 0,
+            totalCalories: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            averagePerWeek: 0,
+          })
+        }
       } catch (error) {
-        console.error("Error loading profile:", error)
+        console.error("Error loading data:", error)
         setProfile({ name: "User", goals: [] })
-      }
-
-      // Generate sample workout data for demonstration
-      const sampleLogs = generateSampleWorkoutLogs()
-      setWorkoutLogs(sampleLogs)
-
-      // Calculate stats
-      calculateStats(sampleLogs)
-    }
-
-    loadData()
-  }, [])
-
-  const generateSampleWorkoutLogs = (): WorkoutLog[] => {
-    const logs: WorkoutLog[] = []
-    const workoutTitles = ["HIIT Cardio", "Strength Training", "Yoga Flow", "Walking", "Pilates", "Swimming", "Cycling"]
-    const intensities = ["low", "medium", "high"]
-
-    // Generate logs for the past 30 days
-    for (let i = 0; i < 30; i++) {
-      // Random chance of workout on each day (70% chance)
-      if (Math.random() > 0.3) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-
-        logs.push({
-          date: date.toISOString().split("T")[0],
-          workoutTitle: workoutTitles[Math.floor(Math.random() * workoutTitles.length)],
-          duration: 20 + Math.floor(Math.random() * 40), // 20-60 minutes
-          calories: 100 + Math.floor(Math.random() * 300), // 100-400 calories
-          intensity: intensities[Math.floor(Math.random() * intensities.length)],
+        setWorkoutLogs([])
+        setStats({
+          totalWorkouts: 0,
+          totalMinutes: 0,
+          totalCalories: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          averagePerWeek: 0,
         })
       }
     }
 
-    return logs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }
+    loadData()
+  }, [])
 
   const calculateStats = (logs: WorkoutLog[]) => {
     const totalWorkouts = logs.length
@@ -394,27 +399,55 @@ export function ProgressView() {
               <CardDescription>Track progress towards your fitness goals</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {profile.goals.map((goal) => {
-                  // Simulate progress for each goal
-                  const progress = 45 + Math.floor(Math.random() * 40)
-
-                  return (
+              {profile.goals.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">
+                  No goals set yet. Update your profile to add fitness goals!
+                </p>
+              ) : stats.totalWorkouts === 0 ? (
+                <div className="space-y-4">
+                  {profile.goals.map((goal) => (
                     <div key={goal} className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium capitalize">{goal}</span>
-                        <span className="text-sm text-muted-foreground">{progress}%</span>
+                        <span className="font-medium">{getGoalLabel(goal)}</span>
+                        <span className="text-sm text-muted-foreground">0%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="h-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all"
-                          style={{ width: `${progress}%` }}
+                          style={{ width: '0%' }}
                         />
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                  <p className="text-sm text-center text-muted-foreground pt-2">
+                    Complete workouts to start tracking your progress!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {profile.goals.map((goal) => {
+                    // Calculate real progress based on workouts completed
+                    // For now, use a simple formula: (totalWorkouts / 30) * 100, capped at 100%
+                    // This assumes 30 workouts as a milestone for achieving goals
+                    const progress = Math.min(Math.round((stats.totalWorkouts / 30) * 100), 100)
+
+                    return (
+                      <div key={goal} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{getGoalLabel(goal)}</span>
+                          <span className="text-sm text-muted-foreground">{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -486,28 +519,56 @@ export function ProgressView() {
               <CardDescription>Milestones you've reached</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="p-4 border-2 border-yellow-200 bg-yellow-50 rounded-lg">
-                  <div className="text-3xl mb-2">🏆</div>
-                  <h4 className="font-semibold">First Workout</h4>
-                  <p className="text-sm text-muted-foreground">Completed your first workout</p>
+              {stats.totalWorkouts === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  Complete workouts to unlock achievements! 🏆
+                </p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* First Workout - Show if completed at least 1 */}
+                  {stats.totalWorkouts >= 1 && (
+                    <div className="p-4 border-2 border-yellow-200 bg-yellow-50 rounded-lg">
+                      <div className="text-3xl mb-2">🏆</div>
+                      <h4 className="font-semibold">First Workout</h4>
+                      <p className="text-sm text-muted-foreground">Completed your first workout</p>
+                    </div>
+                  )}
+                  
+                  {/* 7 Day Streak - Show if current streak is 7+ days */}
+                  {stats.currentStreak >= 7 && (
+                    <div className="p-4 border-2 border-pink-200 bg-pink-50 rounded-lg">
+                      <div className="text-3xl mb-2">🔥</div>
+                      <h4 className="font-semibold">7 Day Streak</h4>
+                      <p className="text-sm text-muted-foreground">Worked out 7 days in a row</p>
+                    </div>
+                  )}
+                  
+                  {/* 10 Workouts - Show if completed 10+ total */}
+                  {stats.totalWorkouts >= 10 && (
+                    <div className="p-4 border-2 border-purple-200 bg-purple-50 rounded-lg">
+                      <div className="text-3xl mb-2">💪</div>
+                      <h4 className="font-semibold">10 Workouts</h4>
+                      <p className="text-sm text-muted-foreground">Completed 10 total workouts</p>
+                    </div>
+                  )}
+                  
+                  {/* 1000 Calories - Show if burned 1000+ calories total */}
+                  {stats.totalCalories >= 1000 && (
+                    <div className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg">
+                      <div className="text-3xl mb-2">⚡</div>
+                      <h4 className="font-semibold">1000 Calories</h4>
+                      <p className="text-sm text-muted-foreground">Burned 1000+ calories</p>
+                    </div>
+                  )}
+                  
+                  {/* Show message if only first workout is unlocked */}
+                  {stats.totalWorkouts >= 1 && stats.totalWorkouts < 10 && stats.currentStreak < 7 && stats.totalCalories < 1000 && (
+                    <div className="col-span-full text-center text-muted-foreground text-sm py-2">
+                      Keep going to unlock more achievements! 💫
+                    </div>
+                  )}
                 </div>
-                <div className="p-4 border-2 border-pink-200 bg-pink-50 rounded-lg">
-                  <div className="text-3xl mb-2">🔥</div>
-                  <h4 className="font-semibold">7 Day Streak</h4>
-                  <p className="text-sm text-muted-foreground">Worked out 7 days in a row</p>
-                </div>
-                <div className="p-4 border-2 border-purple-200 bg-purple-50 rounded-lg">
-                  <div className="text-3xl mb-2">💪</div>
-                  <h4 className="font-semibold">10 Workouts</h4>
-                  <p className="text-sm text-muted-foreground">Completed 10 total workouts</p>
-                </div>
-                <div className="p-4 border-2 border-blue-200 bg-blue-50 rounded-lg">
-                  <div className="text-3xl mb-2">⚡</div>
-                  <h4 className="font-semibold">1000 Calories</h4>
-                  <p className="text-sm text-muted-foreground">Burned 1000+ calories</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
