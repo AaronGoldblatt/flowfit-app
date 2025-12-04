@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Play, Clock, Flame, Moon, Sun, Sparkles, Heart, BookOpen } from "lucide-react"
+import { Play, Clock, Flame, Moon, Sun, Sparkles, Heart, BookOpen, RefreshCw } from "lucide-react"
 import { WorkoutDetailModal } from "@/components/workout-detail-modal"
 import { EducationModal } from "@/components/education-modal"
 import { getProfile } from "@/actions/profile"
 import { getCurrentCycle } from "@/actions/cycles"
-import { getWorkoutStats } from "@/actions/workouts"
+import { getWorkoutStats, getRecommendedWorkouts, getAlternativeWorkout } from "@/actions/workouts"
 import { calculateCycleInfo, type CyclePhase } from "@/lib/cycle-utils"
+import type { WorkoutTemplate } from "@/database/schema/workouts"
 
 interface UserProfile {
   name: string
@@ -25,26 +26,18 @@ interface UserProfile {
   trimester?: string
 }
 
-interface Workout {
-  id: string
-  title: string
-  duration: string
-  intensity: "low" | "medium" | "high"
-  calories: string
-  description: string
-  exercises: string[]
-}
-
 export function HomeDashboard() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [currentPhase, setCurrentPhase] = useState<CyclePhase>("follicular")
   const [dayInCycle, setDayInCycle] = useState(1)
-  const [recommendedWorkouts, setRecommendedWorkouts] = useState<Workout[]>([])
-  const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null)
+  const [recommendedWorkouts, setRecommendedWorkouts] = useState<WorkoutTemplate[]>([])
+  const [selectedWorkout, setSelectedWorkout] = useState<WorkoutTemplate | null>(null)
   const [showWorkoutModal, setShowWorkoutModal] = useState(false)
   const [showEducationModal, setShowEducationModal] = useState(false)
   const [completedWorkouts, setCompletedWorkouts] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [swappingWorkoutId, setSwappingWorkoutId] = useState<string | null>(null)
+  const [swapError, setSwapError] = useState<string | null>(null)
   const [workoutStats, setWorkoutStats] = useState({
     totalWorkouts: 0,
     totalCalories: 0,
@@ -98,11 +91,27 @@ export function HomeDashboard() {
             }
           }
 
-          // Generate recommended workouts using the calculated phase
-          if (parsedProfile.mode === "pregnancy") {
-            setRecommendedWorkouts(getPregnancyWorkouts(parsedProfile.trimester || "first", parsedProfile.fitnessLevel))
+          // Fetch recommended workouts from database
+          const { data: workouts } = await getRecommendedWorkouts(
+            parsedProfile.mode === "pregnancy" ? "pregnancy" : calculatedPhase,
+            parsedProfile.fitnessLevel,
+            parsedProfile.mode === "pregnancy" ? parsedProfile.trimester : undefined,
+            3 // Get 3 random workouts
+          )
+          
+          if (workouts && workouts.length > 0) {
+            setRecommendedWorkouts(workouts)
           } else {
-            setRecommendedWorkouts(getCycleWorkouts(calculatedPhase, parsedProfile.fitnessLevel))
+            // Fallback to any workouts if none match the criteria
+            const { data: fallbackWorkouts } = await getRecommendedWorkouts(
+              parsedProfile.mode === "pregnancy" ? "pregnancy" : calculatedPhase,
+              undefined, // Don't filter by fitness level
+              parsedProfile.mode === "pregnancy" ? parsedProfile.trimester : undefined,
+              3
+            )
+            if (fallbackWorkouts) {
+              setRecommendedWorkouts(fallbackWorkouts)
+            }
           }
 
           // Fetch workout stats
@@ -117,13 +126,18 @@ export function HomeDashboard() {
             age: "",
             fitnessLevel: "intermediate",
             goals: [],
-            mode: "pregnancy" as "cycle" | "pregnancy",
-            trimester: "first",
+            mode: "cycle" as "cycle" | "pregnancy",
+            trimester: undefined,
             cycleLength: "28",
             periodLength: "5",
           }
           setProfile(fallbackProfile)
-          setRecommendedWorkouts(getPregnancyWorkouts("first", "intermediate"))
+          
+          // Fetch fallback workouts
+          const { data: fallbackWorkouts } = await getRecommendedWorkouts("follicular", "intermediate", undefined, 3)
+          if (fallbackWorkouts) {
+            setRecommendedWorkouts(fallbackWorkouts)
+          }
         }
       } catch (error) {
         console.error("Error loading profile:", error)
@@ -133,13 +147,22 @@ export function HomeDashboard() {
           age: "",
           fitnessLevel: "intermediate",
           goals: [],
-          mode: "pregnancy" as "cycle" | "pregnancy",
-          trimester: "first",
+          mode: "cycle" as "cycle" | "pregnancy",
+          trimester: undefined,
           cycleLength: "28",
           periodLength: "5",
         }
         setProfile(fallbackProfile)
-        setRecommendedWorkouts(getPregnancyWorkouts("first", "intermediate"))
+        
+        // Try to fetch fallback workouts even on error
+        try {
+          const { data: fallbackWorkouts } = await getRecommendedWorkouts("follicular", "intermediate", undefined, 3)
+          if (fallbackWorkouts) {
+            setRecommendedWorkouts(fallbackWorkouts)
+          }
+        } catch (workoutError) {
+          console.error("Error loading fallback workouts:", workoutError)
+        }
       } finally {
         setIsLoading(false)
       }
@@ -187,158 +210,73 @@ export function HomeDashboard() {
     return phaseData[phase]
   }
 
-  const getCycleWorkouts = (phase: CyclePhase, fitnessLevel: string): Workout[] => {
-    const workoutsByPhase = {
-      menstrual: [
-        {
-          id: "1",
-          title: "Gentle Yoga Flow",
-          duration: "20 min",
-          intensity: "low" as const,
-          calories: "80-100",
-          description: "Restorative poses to ease cramps and promote relaxation",
-          exercises: ["Child's Pose", "Cat-Cow", "Supine Twist", "Legs Up the Wall"],
-        },
-        {
-          id: "2",
-          title: "Light Walking",
-          duration: "30 min",
-          intensity: "low" as const,
-          calories: "100-120",
-          description: "Easy-paced walk to boost mood and circulation",
-          exercises: ["Warm-up", "Steady pace walk", "Gentle stretching", "Cool down"],
-        },
-      ],
-      follicular: [
-        {
-          id: "3",
-          title: "HIIT Cardio Blast",
-          duration: "25 min",
-          intensity: "high" as const,
-          calories: "250-300",
-          description: "High-energy intervals to match your rising energy",
-          exercises: ["Jumping Jacks", "Burpees", "Mountain Climbers", "High Knees"],
-        },
-        {
-          id: "4",
-          title: "Strength Training",
-          duration: "35 min",
-          intensity: "medium" as const,
-          calories: "200-250",
-          description: "Build muscle with compound movements",
-          exercises: ["Squats", "Deadlifts", "Push-ups", "Rows"],
-        },
-      ],
-      ovulation: [
-        {
-          id: "5",
-          title: "Power HIIT",
-          duration: "30 min",
-          intensity: "high" as const,
-          calories: "300-350",
-          description: "Maximum intensity for peak performance",
-          exercises: ["Box Jumps", "Sprint Intervals", "Plyometric Push-ups", "Jump Squats"],
-        },
-        {
-          id: "6",
-          title: "Advanced Strength",
-          duration: "40 min",
-          intensity: "high" as const,
-          calories: "280-320",
-          description: "Heavy lifting at your peak strength",
-          exercises: ["Barbell Squats", "Bench Press", "Pull-ups", "Overhead Press"],
-        },
-      ],
-      luteal: [
-        {
-          id: "7",
-          title: "Moderate Cardio",
-          duration: "30 min",
-          intensity: "medium" as const,
-          calories: "180-220",
-          description: "Steady-state cardio to maintain fitness",
-          exercises: ["Jogging", "Cycling", "Rowing", "Elliptical"],
-        },
-        {
-          id: "8",
-          title: "Pilates Core",
-          duration: "35 min",
-          intensity: "medium" as const,
-          calories: "150-180",
-          description: "Controlled movements for core strength",
-          exercises: ["Hundred", "Roll-up", "Plank variations", "Side leg lifts"],
-        },
-      ],
+  const handleSwapWorkout = async (workoutId: string) => {
+    if (!profile) return
+    
+    setSwappingWorkoutId(workoutId)
+    setSwapError(null)
+    
+    try {
+      // Exclude all currently displayed workout IDs to avoid duplicates
+      const currentWorkoutIds = recommendedWorkouts.map(w => w.id)
+      
+      console.log("Swapping workout:", workoutId)
+      console.log("Current workout IDs:", currentWorkoutIds)
+      console.log("Phase:", profile.mode === "pregnancy" ? "pregnancy" : currentPhase)
+      console.log("Fitness level:", profile.fitnessLevel)
+      
+      let alternativeWorkout = null
+      
+      // Try with fitness level filter first
+      let result = await getAlternativeWorkout(
+        profile.mode === "pregnancy" ? "pregnancy" : currentPhase,
+        profile.fitnessLevel,
+        profile.mode === "pregnancy" ? profile.trimester : undefined,
+        currentWorkoutIds
+      )
+      
+      console.log("Alternative workout result:", result)
+      
+      if (result.data) {
+        alternativeWorkout = result.data
+      } else {
+        // Fallback: try without fitness level filter
+        console.log("No alternative found with fitness level, trying without filter...")
+        result = await getAlternativeWorkout(
+          profile.mode === "pregnancy" ? "pregnancy" : currentPhase,
+          undefined, // Remove fitness level filter
+          profile.mode === "pregnancy" ? profile.trimester : undefined,
+          currentWorkoutIds
+        )
+        
+        if (result.data) {
+          alternativeWorkout = result.data
+          console.log("Found alternative without fitness level filter")
+        } else {
+          console.warn("No alternative workouts available")
+          setSwapError("No more workouts available to swap")
+          setTimeout(() => setSwapError(null), 3000)
+        }
+      }
+      
+      if (alternativeWorkout) {
+        console.log("Replacing workout with:", alternativeWorkout.title)
+        // Replace the workout in the list - create new array to ensure re-render
+        setRecommendedWorkouts(prev => {
+          const newWorkouts = prev.map(w => 
+            w.id === workoutId ? alternativeWorkout : w
+          )
+          console.log("New workouts array:", newWorkouts.map(w => w.title))
+          return newWorkouts
+        })
+      }
+    } catch (error) {
+      console.error("Error swapping workout:", error)
+      setSwapError("Failed to swap workout")
+      setTimeout(() => setSwapError(null), 3000)
+    } finally {
+      setSwappingWorkoutId(null)
     }
-
-    return workoutsByPhase[phase]
-  }
-
-  const getPregnancyWorkouts = (trimester: string, fitnessLevel: string): Workout[] => {
-    const workoutsByTrimester = {
-      first: [
-        {
-          id: "p1",
-          title: "Prenatal Yoga",
-          duration: "25 min",
-          intensity: "low" as const,
-          calories: "100-120",
-          description: "Gentle stretches safe for early pregnancy",
-          exercises: ["Modified Sun Salutations", "Pelvic Tilts", "Cat-Cow", "Side Stretches"],
-        },
-        {
-          id: "p2",
-          title: "Walking & Breathing",
-          duration: "20 min",
-          intensity: "low" as const,
-          calories: "80-100",
-          description: "Light cardio with breathing exercises",
-          exercises: ["Warm-up walk", "Breathing practice", "Gentle pace", "Cool down"],
-        },
-      ],
-      second: [
-        {
-          id: "p3",
-          title: "Prenatal Strength",
-          duration: "30 min",
-          intensity: "medium" as const,
-          calories: "150-180",
-          description: "Safe strength training for second trimester",
-          exercises: ["Modified Squats", "Wall Push-ups", "Bicep Curls", "Lateral Raises"],
-        },
-        {
-          id: "p4",
-          title: "Aqua Aerobics",
-          duration: "35 min",
-          intensity: "medium" as const,
-          calories: "180-200",
-          description: "Low-impact water exercises",
-          exercises: ["Water walking", "Leg lifts", "Arm circles", "Floating stretches"],
-        },
-      ],
-      third: [
-        {
-          id: "p5",
-          title: "Gentle Prenatal Flow",
-          duration: "20 min",
-          intensity: "low" as const,
-          calories: "80-100",
-          description: "Relaxing movements for late pregnancy",
-          exercises: ["Pelvic Floor", "Hip Circles", "Gentle Stretches", "Relaxation"],
-        },
-        {
-          id: "p6",
-          title: "Birth Prep Exercises",
-          duration: "25 min",
-          intensity: "low" as const,
-          calories: "90-110",
-          description: "Prepare your body for labor",
-          exercises: ["Squats", "Pelvic Tilts", "Kegels", "Breathing Techniques"],
-        },
-      ],
-    }
-
-    return workoutsByTrimester[trimester as keyof typeof workoutsByTrimester] || workoutsByTrimester.first
   }
 
   const handleWorkoutComplete = (workoutId: string) => {
@@ -479,70 +417,106 @@ export function HomeDashboard() {
       {/* Today's Workouts */}
       <div>
         <h3 className="text-2xl font-bold mb-4 text-slate-100">Recommended for You Today</h3>
-        <div className="grid gap-4 md:grid-cols-2">
-          {recommendedWorkouts.map((workout) => (
-            <Card
-              key={workout.id}
-              className="border-indigo-500/30 bg-slate-900/80 backdrop-blur-sm hover:shadow-xl hover:shadow-indigo-500/20 transition-all"
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg text-slate-100">{workout.title}</CardTitle>
-                    <CardDescription className="mt-1 text-slate-400">{workout.description}</CardDescription>
+        
+        {/* Swap Error Message */}
+        {swapError && (
+          <div className="mb-4 p-3 rounded-lg bg-yellow-950/50 border border-yellow-500/30 text-yellow-300 text-sm">
+            {swapError}
+          </div>
+        )}
+        
+        {recommendedWorkouts.length === 0 ? (
+          <Card className="border-indigo-500/30 bg-slate-900/80 backdrop-blur-sm">
+            <CardContent className="py-12 text-center">
+              <p className="text-slate-400">No workouts found. Try updating your profile settings.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {recommendedWorkouts.map((workout) => (
+              <Card
+                key={workout.id}
+                className="border-indigo-500/30 bg-slate-900/80 backdrop-blur-sm hover:shadow-xl hover:shadow-indigo-500/20 transition-all"
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg text-slate-100">{workout.title}</CardTitle>
+                      <CardDescription className="mt-1 text-slate-400">{workout.description}</CardDescription>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        workout.intensity === "high"
+                          ? "bg-red-950/50 text-red-300 border-red-600/30"
+                          : workout.intensity === "medium"
+                            ? "bg-yellow-950/50 text-yellow-300 border-yellow-600/30"
+                            : "bg-green-950/50 text-green-300 border-green-600/30"
+                      }
+                    >
+                      {workout.intensity}
+                    </Badge>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={
-                      workout.intensity === "high"
-                        ? "bg-red-950/50 text-red-300 border-red-600/30"
-                        : workout.intensity === "medium"
-                          ? "bg-yellow-950/50 text-yellow-300 border-yellow-600/30"
-                          : "bg-green-950/50 text-green-300 border-green-600/30"
-                    }
-                  >
-                    {workout.intensity}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4 text-sm text-slate-400">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{workout.duration}</span>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4 text-sm text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>{workout.duration} min</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Flame className="h-4 w-4" />
+                      <span>{workout.caloriesMin}-{workout.caloriesMax} cal</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Flame className="h-4 w-4" />
-                    <span>{workout.calories} cal</span>
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-300">Exercises:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {workout.exercises.map((exercise, idx) => (
-                      <Badge
-                        key={idx}
-                        variant="secondary"
-                        className="text-xs bg-slate-800 text-slate-300 border-slate-700"
-                      >
-                        {exercise}
-                      </Badge>
-                    ))}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-slate-300">Exercises:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(workout.exercises as string[]).slice(0, 3).map((exercise, idx) => (
+                        <Badge
+                          key={idx}
+                          variant="secondary"
+                          className="text-xs bg-slate-800 text-slate-300 border-slate-700"
+                        >
+                          {exercise}
+                        </Badge>
+                      ))}
+                      {(workout.exercises as string[]).length > 3 && (
+                        <Badge
+                          variant="secondary"
+                          className="text-xs bg-slate-800 text-slate-300 border-slate-700"
+                        >
+                          +{(workout.exercises as string[]).length - 3} more
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <Button
-                  onClick={() => handleWorkoutClick(workout)}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Start Workout
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleWorkoutClick(workout)}
+                      className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Start
+                    </Button>
+                    <Button
+                      onClick={() => handleSwapWorkout(workout.id)}
+                      variant="outline"
+                      size="icon"
+                      className="border-indigo-500/30 text-slate-300 hover:bg-slate-800"
+                      disabled={swappingWorkoutId === workout.id}
+                      title="Try a different workout"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${swappingWorkoutId === workout.id ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Quick Stats */}

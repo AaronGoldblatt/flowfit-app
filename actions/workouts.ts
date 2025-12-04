@@ -35,7 +35,8 @@ async function getProfileId() {
 export async function getRecommendedWorkouts(
   phase?: string,
   fitnessLevel?: string,
-  trimester?: string
+  trimester?: string,
+  limit = 3
 ) {
   try {
     let query = db.select().from(workoutTemplates);
@@ -63,9 +64,13 @@ export async function getRecommendedWorkouts(
 
     const templates = await query;
 
+    // Shuffle and return random selection
+    const shuffled = templates.sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, limit);
+
     return {
       error: null,
-      data: templates,
+      data: selected,
     };
   } catch (error) {
     console.error("Get recommended workouts error:", error);
@@ -75,6 +80,73 @@ export async function getRecommendedWorkouts(
           ? error.message
           : "Failed to get recommended workouts",
       data: [],
+    };
+  }
+}
+
+/**
+ * Get a single random workout to replace another
+ */
+export async function getAlternativeWorkout(
+  phase?: string,
+  fitnessLevel?: string,
+  trimester?: string,
+  excludeIds?: string[]
+) {
+  try {
+    let query = db.select().from(workoutTemplates);
+
+    // Build conditions
+    const conditions = [];
+
+    if (phase) {
+      conditions.push(eq(workoutTemplates.phase, phase));
+    }
+
+    if (trimester) {
+      conditions.push(eq(workoutTemplates.trimester, trimester));
+    }
+
+    if (fitnessLevel) {
+      conditions.push(
+        sql`(${workoutTemplates.fitnessLevel} = ${fitnessLevel} OR ${workoutTemplates.fitnessLevel} IS NULL)`
+      );
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    let templates = await query;
+
+    // Filter out all excluded workouts
+    if (excludeIds && excludeIds.length > 0) {
+      templates = templates.filter(t => !excludeIds.includes(t.id));
+    }
+
+    // Return a random workout
+    if (templates.length === 0) {
+      return {
+        error: "No alternative workouts found",
+        data: null,
+      };
+    }
+
+    const randomIndex = Math.floor(Math.random() * templates.length);
+    const selected = templates[randomIndex];
+
+    return {
+      error: null,
+      data: selected,
+    };
+  } catch (error) {
+    console.error("Get alternative workout error:", error);
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to get alternative workout",
+      data: null,
     };
   }
 }
