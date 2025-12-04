@@ -35,7 +35,7 @@ export function MainApp() {
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#312e81] pb-20">
       {/* Header */}
       <header className="bg-[#1e293b]/80 backdrop-blur-sm border-b border-[#475569] sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
           <button 
             onClick={() => setActiveTab("home")}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
@@ -55,7 +55,7 @@ export function MainApp() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20">
         {activeTab === "home" && <HomeDashboard />}
         {activeTab === "cycle" && (isPregnancyMode ? <PregnancyTracker /> : <CycleTracker />)}
         {activeTab === "progress" && <ProgressView />}
@@ -66,8 +66,8 @@ export function MainApp() {
       <EditProfileModal open={showEditProfile} onClose={() => setShowEditProfile(false)} />
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#1e293b]/90 backdrop-blur-sm border-t border-[#475569]">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-around">
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#1e293b]/90 backdrop-blur-sm border-t border-[#475569] z-20">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-around">
           <Button
             variant={activeTab === "home" ? "default" : "ghost"}
             size="sm"
