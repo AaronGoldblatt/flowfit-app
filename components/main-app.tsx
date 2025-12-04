@@ -72,6 +72,7 @@ export function MainApp() {
             variant={activeTab === "home" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("home")}
+            title="Home"
             className={
               activeTab === "home"
                 ? "bg-gradient-to-r from-[#8b5cf6] to-[#3b82f6] text-white hover:from-[#7c3aed] hover:to-[#2563eb]"
@@ -84,6 +85,7 @@ export function MainApp() {
             variant={activeTab === "cycle" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("cycle")}
+            title={isPregnancyMode ? "Pregnancy Tracker" : "Cycle Tracker"}
             className={
               activeTab === "cycle"
                 ? "bg-gradient-to-r from-[#8b5cf6] to-[#3b82f6] text-white hover:from-[#7c3aed] hover:to-[#2563eb]"
@@ -96,6 +98,7 @@ export function MainApp() {
             variant={activeTab === "progress" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("progress")}
+            title="Progress"
             className={
               activeTab === "progress"
                 ? "bg-gradient-to-r from-[#8b5cf6] to-[#3b82f6] text-white hover:from-[#7c3aed] hover:to-[#2563eb]"
@@ -108,6 +111,7 @@ export function MainApp() {
             variant={activeTab === "profile" ? "default" : "ghost"}
             size="sm"
             onClick={() => setActiveTab("profile")}
+            title="Profile"
             className={
               activeTab === "profile"
                 ? "bg-gradient-to-r from-[#8b5cf6] to-[#3b82f6] text-white hover:from-[#7c3aed] hover:to-[#2563eb]"
