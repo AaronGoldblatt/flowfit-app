@@ -90,6 +90,17 @@ export function CycleTracker() {
   }
 
   const getPhaseColor = (phase: CyclePhase | null): string => {
+    if (!phase) return "bg-gray-100 text-gray-900"
+    const colors = {
+      menstrual: "bg-red-100 border-red-300 text-red-900",
+      follicular: "bg-green-100 border-green-300 text-green-900",
+      ovulation: "bg-yellow-100 border-yellow-300 text-yellow-900",
+      luteal: "bg-purple-100 border-purple-300 text-purple-900",
+    }
+    return colors[phase]
+  }
+
+  const getPhaseBackgroundOnly = (phase: CyclePhase | null): string => {
     if (!phase) return "bg-gray-100"
     const colors = {
       menstrual: "bg-red-100 border-red-300",
@@ -100,13 +111,25 @@ export function CycleTracker() {
     return colors[phase]
   }
 
+  const getPhaseIconColor = (phase: CyclePhase | null): string => {
+    if (!phase) return "text-gray-600"
+    const colors = {
+      menstrual: "text-red-700",
+      follicular: "text-green-700",
+      ovulation: "text-yellow-700",
+      luteal: "text-purple-700",
+    }
+    return colors[phase]
+  }
+
   const getPhaseIcon = (phase: CyclePhase | null) => {
     if (!phase) return null
+    const iconColor = getPhaseIconColor(phase)
     const icons = {
-      menstrual: <Droplets className="h-3 w-3" />,
-      follicular: <Sparkles className="h-3 w-3" />,
-      ovulation: <Sun className="h-3 w-3" />,
-      luteal: <Moon className="h-3 w-3" />,
+      menstrual: <Droplets className={`h-3 w-3 ${iconColor}`} />,
+      follicular: <Sparkles className={`h-3 w-3 ${iconColor}`} />,
+      ovulation: <Sun className={`h-3 w-3 ${iconColor}`} />,
+      luteal: <Moon className={`h-3 w-3 ${iconColor}`} />,
     }
     return icons[phase]
   }
@@ -216,7 +239,9 @@ export function CycleTracker() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-full ${getPhaseColor(currentPhase)}`}>{getPhaseIcon(currentPhase)}</div>
+                  <div className={`p-3 rounded-full ${getPhaseBackgroundOnly(currentPhase)}`}>
+                    {getPhaseIcon(currentPhase)}
+                  </div>
                   <div>
                     <CardTitle className="text-lg">
                       {currentPhase
@@ -285,10 +310,10 @@ export function CycleTracker() {
                       }`}
                     >
                       <div className="flex flex-col items-center justify-center h-full">
-                        <span className="text-sm font-medium">{format(day, "d")}</span>
+                        <span className="text-sm font-semibold">{format(day, "d")}</span>
                         {phase && <div className="mt-1">{getPhaseIcon(phase)}</div>}
                         {log && log.symptoms.length > 0 && (
-                          <div className="mt-1 w-1.5 h-1.5 rounded-full bg-pink-500" />
+                          <div className="mt-1 w-2 h-2 rounded-full bg-pink-600 border border-pink-800" />
                         )}
                       </div>
                     </button>
@@ -302,25 +327,25 @@ export function CycleTracker() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-300 flex items-center justify-center">
-                      <Droplets className="h-3 w-3" />
+                      <Droplets className="h-3 w-3 text-red-700" />
                     </div>
                     <span className="text-sm">Menstrual</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded bg-green-100 border-2 border-green-300 flex items-center justify-center">
-                      <Sparkles className="h-3 w-3" />
+                      <Sparkles className="h-3 w-3 text-green-700" />
                     </div>
                     <span className="text-sm">Follicular</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded bg-yellow-100 border-2 border-yellow-300 flex items-center justify-center">
-                      <Sun className="h-3 w-3" />
+                      <Sun className="h-3 w-3 text-yellow-700" />
                     </div>
                     <span className="text-sm">Ovulation</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-300 flex items-center justify-center">
-                      <Moon className="h-3 w-3" />
+                      <Moon className="h-3 w-3 text-purple-700" />
                     </div>
                     <span className="text-sm">Luteal</span>
                   </div>
