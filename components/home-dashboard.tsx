@@ -13,11 +13,13 @@ import { getCurrentCycle } from "@/actions/cycles"
 import { getWorkoutStats, getRecommendedWorkouts, getAlternativeWorkout } from "@/actions/workouts"
 import { calculateCycleInfo, type CyclePhase } from "@/lib/cycle-utils"
 import type { WorkoutTemplate } from "@/database/schema/workouts"
+import { getPersonaMotivation } from "@/lib/personas"
 
 interface UserProfile {
   name: string
   age: string
   fitnessLevel: string
+  persona?: string
   lastPeriodDate?: string
   cycleLength: string
   periodLength: string
@@ -61,6 +63,7 @@ export function HomeDashboard() {
             name: profileData.name,
             age: profileData.age?.toString() || "",
             fitnessLevel: profileData.fitnessLevel || "",
+            persona: profileData.persona || undefined,
             goals: profileData.goals || [],
             mode: profileData.mode as "cycle" | "pregnancy",
             trimester: profileData.trimester || undefined,
@@ -318,6 +321,11 @@ export function HomeDashboard() {
             ? `${profile.trimester?.charAt(0).toUpperCase()}${profile.trimester?.slice(1)} Trimester`
             : `Day ${dayInCycle} of your cycle`}
         </p>
+        {profile.persona && (
+          <p className="text-indigo-300 mt-2 italic text-sm">
+            ✨ {getPersonaMotivation(profile.persona)}
+          </p>
+        )}
       </div>
 
       {/* Current Phase Card */}

@@ -20,6 +20,7 @@ import { useSession } from "@/lib/auth-client"
 import { User, Mail, Lock, Loader2, Target, Calendar as CalendarIcon, Heart } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { PERSONAS, type PersonaType } from "@/lib/personas"
 
 interface EditProfileModalProps {
   open: boolean
@@ -44,6 +45,7 @@ export function EditProfileModal({ open, onClose }: EditProfileModalProps) {
   // Profile info state
   const [age, setAge] = useState("")
   const [fitnessLevel, setFitnessLevel] = useState<"beginner" | "intermediate" | "advanced">("beginner")
+  const [persona, setPersona] = useState<PersonaType | "">("" as PersonaType | "")
   const [goals, setGoals] = useState<string[]>([])
   const [mode, setMode] = useState<"cycle" | "pregnancy">("cycle")
   const [trimester, setTrimester] = useState<"first" | "second" | "third">("first")
@@ -70,6 +72,7 @@ export function EditProfileModal({ open, onClose }: EditProfileModalProps) {
       if (profileData) {
         setAge(profileData.age?.toString() || "")
         setFitnessLevel(profileData.fitnessLevel as "beginner" | "intermediate" | "advanced")
+        setPersona((profileData.persona || "") as PersonaType | "")
         setGoals(profileData.goals || [])
         setMode(profileData.mode as "cycle" | "pregnancy")
         setTrimester(profileData.trimester as "first" | "second" | "third" || "first")
@@ -176,6 +179,7 @@ export function EditProfileModal({ open, onClose }: EditProfileModalProps) {
       const profileResult = await updateProfile({
         age: age ? Number.parseInt(age) : undefined,
         fitnessLevel,
+        persona: persona || undefined,
         goals,
         mode,
         trimester: mode === "pregnancy" ? trimester : undefined,
@@ -348,6 +352,42 @@ export function EditProfileModal({ open, onClose }: EditProfileModalProps) {
                         </div>
                       </RadioGroup>
                     </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-slate-200">Your Persona (Optional)</Label>
+                    <div className="grid grid-cols-1 gap-2 max-h-80 overflow-y-auto pr-2">
+                      {Object.values(PERSONAS).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setPersona(p.id)}
+                          className={cn(
+                            "p-3 border-2 rounded-lg text-left transition-all hover:scale-[1.01] cursor-pointer",
+                            persona === p.id
+                              ? "border-indigo-500 bg-indigo-950/50 shadow-md"
+                              : "border-indigo-500/30 bg-slate-800/30 hover:border-indigo-500/50"
+                          )}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-2xl">{p.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-slate-100">{p.label}</div>
+                              <div className="text-xs text-slate-400 line-clamp-2">{p.description}</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {persona && (
+                      <button
+                        type="button"
+                        onClick={() => setPersona("" as PersonaType | "")}
+                        className="text-xs text-slate-400 hover:text-slate-300 underline"
+                      >
+                        Clear persona
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-3">

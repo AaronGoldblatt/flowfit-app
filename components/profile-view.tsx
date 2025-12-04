@@ -4,16 +4,18 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { User, Calendar, Target, Activity } from "lucide-react"
+import { User, Calendar, Target, Activity, Sparkles } from "lucide-react"
 import { getProfile } from "@/actions/profile"
 import { getCurrentCycle } from "@/actions/cycles"
 import { getWorkoutLogs } from "@/actions/workouts"
 import { getGoalLabel } from "@/lib/utils"
+import { getPersonaInfo } from "@/lib/personas"
 
 interface UserProfile {
   name: string
   age: string
   fitnessLevel: string
+  persona?: string
   lastPeriodDate?: string
   cycleLength: string
   periodLength: string
@@ -43,6 +45,7 @@ export function ProfileView({ onEditProfile }: ProfileViewProps) {
             name: profileData.name,
             age: profileData.age?.toString() || "",
             fitnessLevel: profileData.fitnessLevel || "",
+            persona: profileData.persona || undefined,
             goals: profileData.goals || [],
             mode: profileData.mode as "cycle" | "pregnancy",
             trimester: profileData.trimester || undefined,
@@ -109,6 +112,42 @@ export function ProfileView({ onEditProfile }: ProfileViewProps) {
           </div>
         </CardHeader>
       </Card>
+
+      {profile.persona && (() => {
+        const personaInfo = getPersonaInfo(profile.persona);
+        return personaInfo ? (
+          <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-indigo-500" />
+                <CardTitle>Your Persona</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">{personaInfo.icon}</span>
+                <div>
+                  <div className="font-semibold text-lg">{personaInfo.label}</div>
+                  <div className="text-sm text-muted-foreground">{personaInfo.description}</div>
+                </div>
+              </div>
+              <div className="p-3 bg-indigo-100/50 rounded-lg border border-indigo-200">
+                <p className="text-sm text-indigo-900 italic">"{personaInfo.motivationalMessage}"</p>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground mb-2">Focus Areas:</div>
+                <div className="flex flex-wrap gap-2">
+                  {personaInfo.focusAreas.map((area) => (
+                    <Badge key={area} variant="outline" className="border-indigo-300 text-indigo-700 bg-white/50">
+                      {area}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
 
       <Card className="border-pink-200">
         <CardHeader>

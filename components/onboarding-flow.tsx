@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, ChevronRight, ChevronLeft } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { PERSONAS, type PersonaType } from "@/lib/personas"
 
 interface OnboardingFlowProps {
   onComplete: () => void
@@ -22,6 +23,7 @@ interface UserProfile {
   name: string
   age: string
   fitnessLevel: string
+  persona: PersonaType | ""
   lastPeriodDate: Date | undefined
   cycleLength: string
   periodLength: string
@@ -36,6 +38,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     name: "",
     age: "",
     fitnessLevel: "",
+    persona: "",
     lastPeriodDate: undefined,
     cycleLength: "28",
     periodLength: "5",
@@ -65,6 +68,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
         name: profile.name,
         age: profile.age ? Number.parseInt(profile.age) : undefined,
         fitnessLevel: profile.fitnessLevel as "beginner" | "intermediate" | "advanced",
+        persona: profile.persona || undefined,
         goals: profile.goals,
         mode: profile.mode,
         trimester: profile.trimester as "first" | "second" | "third" | undefined,
@@ -198,6 +202,42 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   </Label>
                 </div>
               </RadioGroup>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-slate-200">Which persona best describes you? (Optional)</Label>
+              <div className="grid grid-cols-1 gap-3">
+                {Object.values(PERSONAS).map((persona) => (
+                  <button
+                    key={persona.id}
+                    type="button"
+                    onClick={() => updateProfile({ persona: persona.id })}
+                    className={cn(
+                      "p-4 border-2 rounded-lg text-left transition-all hover:scale-[1.02] cursor-pointer",
+                      profile.persona === persona.id
+                        ? "border-indigo-500 bg-indigo-950/50 shadow-lg shadow-indigo-500/20"
+                        : "border-indigo-500/30 bg-slate-800/30 hover:border-indigo-500/50"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-3xl">{persona.icon}</span>
+                      <div className="flex-1">
+                        <div className="font-semibold text-slate-100 mb-1">{persona.label}</div>
+                        <div className="text-sm text-slate-400">{persona.description}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {profile.persona && (
+                <button
+                  type="button"
+                  onClick={() => updateProfile({ persona: "" })}
+                  className="text-sm text-slate-400 hover:text-slate-300 underline"
+                >
+                  Clear selection
+                </button>
+              )}
             </div>
 
             <div className="flex gap-3">

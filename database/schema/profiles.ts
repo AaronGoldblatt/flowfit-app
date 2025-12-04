@@ -17,6 +17,9 @@ export const profiles = pgTable("profiles", {
   fitnessLevel: text("fitness_level", {
     enum: ["beginner", "intermediate", "advanced"],
   }).notNull(),
+  persona: text("persona", {
+    enum: ["student", "professional", "athlete", "new_mother", "busy_parent", "wellness_enthusiast"],
+  }),
   goals: json("goals").$type<string[]>().default([]).notNull(),
   mode: text("mode", { enum: ["cycle", "pregnancy"] })
     .default("cycle")
@@ -38,6 +41,7 @@ export const insertProfileSchema = createInsertSchema(profiles, {
   name: z.string().min(1, "Name is required"),
   age: z.number().int().min(13).max(120).optional(),
   fitnessLevel: z.enum(["beginner", "intermediate", "advanced"]),
+  persona: z.enum(["student", "professional", "athlete", "new_mother", "busy_parent", "wellness_enthusiast"]).optional(),
   goals: z.array(z.string()).default([]),
   mode: z.enum(["cycle", "pregnancy"]).default("cycle"),
   trimester: z.enum(["first", "second", "third"]).optional(),
