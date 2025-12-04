@@ -69,12 +69,12 @@ export default function SignUpPage() {
           <form onSubmit={handleSignUp} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-slate-200">
-                Name
+                Username
               </Label>
               <Input
                 id="name"
                 type="text"
-                placeholder="Your name"
+                placeholder="Your username"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required

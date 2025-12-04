@@ -45,6 +45,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     goals: [],
     mode: "cycle",
   })
+  const [ageError, setAgeError] = useState<string>("")
 
   const updateProfile = (updates: Partial<UserProfile>) => {
     setProfile((prev) => ({ ...prev, ...updates }))
@@ -149,11 +150,11 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-slate-200">
-                What's your name?
+                Create a username
               </Label>
               <Input
                 id="name"
-                placeholder="Enter your name"
+                placeholder="Enter your username"
                 value={profile.name}
                 onChange={(e) => updateProfile({ name: e.target.value })}
                 className="border-indigo-500/30 bg-slate-800/50 text-slate-100 placeholder:text-slate-500"
@@ -169,9 +170,40 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 type="number"
                 placeholder="Enter your age"
                 value={profile.age}
-                onChange={(e) => updateProfile({ age: e.target.value })}
-                className="border-indigo-500/30 bg-slate-800/50 text-slate-100 placeholder:text-slate-500"
+                onChange={(e) => {
+                  const value = e.target.value
+                  // Allow empty string for clearing
+                  if (value === "") {
+                    setAgeError("")
+                    updateProfile({ age: "" })
+                    return
+                  }
+                  
+                  const ageNum = Number.parseInt(value, 10)
+                  
+                  // Check if it's a valid number
+                  if (isNaN(ageNum)) {
+                    return
+                  }
+                  
+                  // Validate age range
+                  if (ageNum < 0 || ageNum > 100) {
+                    setAgeError("Age is out of range. Please enter a valid age.")
+                    return
+                  }
+                  
+                  // Valid age, update and clear error
+                  setAgeError("")
+                  updateProfile({ age: value })
+                }}
+                className={cn(
+                  "border-indigo-500/30 bg-slate-800/50 text-slate-100 placeholder:text-slate-500",
+                  ageError && "border-red-500/50"
+                )}
               />
+              {ageError && (
+                <p className="text-sm text-red-400">{ageError}</p>
+              )}
             </div>
 
             <div className="space-y-3">
