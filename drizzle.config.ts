@@ -6,20 +6,17 @@ dotenv.config();
 const databaseUrl =
   process.env.NODE_ENV === "production"
     ? process.env.DATABASE_URL
-    : process.env.LOCAL_DATABASE_URL;
+    : process.env.LOCAL_DATABASE_URL || process.env.DATABASE_URL;
 
-if (!databaseUrl) {
-  throw new Error(
-    "DATABASE_URL or LOCAL_DATABASE_URL must be defined in .env file"
-  );
-}
+// Use placeholder during build if no DB URL (drizzle-kit is only for migrations)
+const dbUrl = databaseUrl || "postgresql://placeholder:placeholder@localhost:5432/placeholder";
 
 export default defineConfig({
   schema: "./database/schema/*",
   out: "./database/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: databaseUrl,
+    url: dbUrl,
   },
   verbose: true,
   strict: true,
