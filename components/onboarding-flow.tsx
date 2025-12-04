@@ -385,7 +385,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   key={goal.id}
                   onClick={() => toggleGoal(goal.id)}
                   className={cn(
-                    "p-4 border-2 rounded-lg text-left transition-all hover:scale-105",
+                    "p-4 border-2 rounded-lg text-left transition-all hover:scale-105 cursor-pointer",
                     profile.goals.includes(goal.id)
                       ? "border-indigo-500 bg-indigo-950/50"
                       : "border-indigo-500/30 bg-slate-800/30 hover:border-indigo-500/50",
