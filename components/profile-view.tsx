@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Calendar, Target, Activity } from "lucide-react"
 import { getProfile } from "@/actions/profile"
 import { getCurrentCycle } from "@/actions/cycles"
+import { getGoalLabel } from "@/lib/utils"
 
 interface UserProfile {
   name: string
@@ -20,7 +21,11 @@ interface UserProfile {
   trimester?: string
 }
 
-export function ProfileView() {
+interface ProfileViewProps {
+  onEditProfile?: () => void
+}
+
+export function ProfileView({ onEditProfile }: ProfileViewProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
@@ -130,7 +135,7 @@ export function ProfileView() {
           <div className="flex flex-wrap gap-2">
             {profile.goals.map((goal) => (
               <Badge key={goal} variant="secondary" className="text-sm">
-                {goal.charAt(0).toUpperCase() + goal.slice(1)}
+                {getGoalLabel(goal)}
               </Badge>
             ))}
           </div>
@@ -160,7 +165,11 @@ export function ProfileView() {
         </CardContent>
       </Card>
 
-      <Button variant="outline" className="w-full bg-transparent">
+      <Button 
+        variant="outline" 
+        className="w-full bg-transparent"
+        onClick={onEditProfile}
+      >
         Edit Profile
       </Button>
     </div>

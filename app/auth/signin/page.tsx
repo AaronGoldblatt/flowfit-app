@@ -51,9 +51,11 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center starry-bg p-4">
       <Card className="w-full max-w-md border-indigo-500/30 shadow-2xl bg-slate-900/90 backdrop-blur-sm">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center moon-glow">
-            <Moon className="h-8 w-8 text-slate-100" />
-          </div>
+          <Link href="/" className="inline-block hover:opacity-80 transition-opacity">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center moon-glow">
+              <Moon className="h-8 w-8 text-slate-100" />
+            </div>
+          </Link>
           <CardTitle className="text-3xl font-bold lunar-gradient-text">
             Welcome Back
           </CardTitle>
