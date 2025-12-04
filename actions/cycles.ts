@@ -41,11 +41,15 @@ export async function upsertCycle(data: InsertCycle | UpdateCycle) {
   try {
     const profileId = await getProfileId();
 
+    console.log("Server upsertCycle received:", data);
+
     // Validate input
     const validatedData = insertCycleSchema.parse({
       ...data,
       profileId,
     });
+
+    console.log("Server validated data:", validatedData);
 
     // Check if an active cycle exists
     const existing = await db.query.cycles.findFirst({
@@ -64,6 +68,8 @@ export async function upsertCycle(data: InsertCycle | UpdateCycle) {
       // Create new cycle
       [result] = await db.insert(cycles).values(validatedData).returning();
     }
+
+    console.log("Server saved to DB, result:", result);
 
     revalidatePath("/");
 
