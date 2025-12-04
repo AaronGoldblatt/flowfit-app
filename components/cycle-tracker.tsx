@@ -305,7 +305,7 @@ export function CycleTracker() {
                     <button
                       key={day.toISOString()}
                       onClick={() => openLogDialog(day)}
-                      className={`aspect-square p-2 rounded-lg border-2 transition-all hover:scale-105 ${getPhaseColor(phase)} ${
+                      className={`aspect-square p-2 rounded-lg border-2 transition-all hover:scale-105 cursor-pointer ${getPhaseColor(phase)} ${
                         isToday ? "ring-2 ring-pink-500 ring-offset-2" : ""
                       }`}
                     >

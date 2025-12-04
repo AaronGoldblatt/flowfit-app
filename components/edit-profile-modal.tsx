@@ -369,7 +369,7 @@ export function EditProfileModal({ open, onClose }: EditProfileModalProps) {
                           type="button"
                           onClick={() => toggleGoal(goal.id)}
                           className={cn(
-                            "p-3 border-2 rounded-lg text-left transition-all",
+                            "p-3 border-2 rounded-lg text-left transition-all cursor-pointer",
                             goals.includes(goal.id)
                               ? "border-indigo-500 bg-indigo-950/50"
                               : "border-indigo-500/30 bg-slate-800/30 hover:border-indigo-500/50"
