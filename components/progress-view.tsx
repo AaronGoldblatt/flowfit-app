@@ -36,45 +36,59 @@ export function ProgressView() {
     averagePerWeek: 0,
   })
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const { data: profileData } = await getProfile()
-        if (profileData) {
-          setProfile({
-            name: profileData.name,
-            goals: profileData.goals || [],
-          })
-        }
+  const loadData = async () => {
+    try {
+      console.log("[ProgressView] Loading data...")
+      
+      const { data: profileData } = await getProfile()
+      if (profileData) {
+        setProfile({
+          name: profileData.name,
+          goals: profileData.goals || [],
+        })
+        console.log("[ProgressView] Profile loaded:", profileData.name)
+      }
 
-        // Fetch real workout logs from database
-        const { data: workoutLogsData } = await getWorkoutLogs(30)
-        if (workoutLogsData) {
-          // Transform database workout logs to match the expected format
-          const transformedLogs: WorkoutLog[] = workoutLogsData.map((log) => ({
+      // Fetch real workout logs from database
+      const { error, data: workoutLogsData } = await getWorkoutLogs(30)
+      
+      if (error) {
+        console.error("[ProgressView] Error fetching workout logs:", error)
+        setWorkoutLogs([])
+        setStats({
+          totalWorkouts: 0,
+          totalMinutes: 0,
+          totalCalories: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          averagePerWeek: 0,
+        })
+        return
+      }
+
+      if (workoutLogsData && workoutLogsData.length > 0) {
+        console.log("[ProgressView] Workout logs found:", workoutLogsData.length, "logs")
+        console.log("[ProgressView] Raw workout logs data:", workoutLogsData)
+        
+        // Transform database workout logs to match the expected format
+        // Note: workoutTemplate relation is not loaded, so we use workoutTitle directly
+        const transformedLogs: WorkoutLog[] = workoutLogsData.map((log: any) => {
+          return {
             date: log.date,
-            workoutTitle: log.workoutType || "Workout",
+            workoutTitle: log.workoutTitle || "Workout",
             duration: log.duration || 0,
             calories: log.caloriesBurned || 0,
-            intensity: log.intensity || "medium",
-          }))
-          setWorkoutLogs(transformedLogs)
-          calculateStats(transformedLogs)
-        } else {
-          // No workout logs yet - set empty arrays and zero stats
-          setWorkoutLogs([])
-          setStats({
-            totalWorkouts: 0,
-            totalMinutes: 0,
-            totalCalories: 0,
-            currentStreak: 0,
-            longestStreak: 0,
-            averagePerWeek: 0,
-          })
-        }
-      } catch (error) {
-        console.error("Error loading data:", error)
-        setProfile({ name: "User", goals: [] })
+            intensity: "medium", // Default intensity since we don't load workoutTemplate
+          }
+        })
+        
+        console.log("[ProgressView] Transformed logs:", transformedLogs)
+        setWorkoutLogs(transformedLogs)
+        calculateStats(transformedLogs)
+        console.log("[ProgressView] Stats calculated for", transformedLogs.length, "workouts")
+      } else {
+        // No workout logs yet - set empty arrays and zero stats
+        console.log("[ProgressView] No workout logs found. workoutLogsData:", workoutLogsData)
         setWorkoutLogs([])
         setStats({
           totalWorkouts: 0,
@@ -85,9 +99,48 @@ export function ProgressView() {
           averagePerWeek: 0,
         })
       }
+    } catch (error) {
+      console.error("[ProgressView] Error loading data:", error)
+      setProfile({ name: "User", goals: [] })
+      setWorkoutLogs([])
+      setStats({
+        totalWorkouts: 0,
+        totalMinutes: 0,
+        totalCalories: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        averagePerWeek: 0,
+      })
     }
+  }
 
+  useEffect(() => {
     loadData()
+
+    const handleWorkoutCompleted = () => {
+      console.log("[ProgressView] WorkoutCompleted event received! Refreshing data...")
+      loadData()
+    }
+    window.addEventListener("workoutCompleted", handleWorkoutCompleted)
+
+    // Listen for window focus events (方案 A)
+    const handleFocus = () => {
+      loadData()
+    }
+    window.addEventListener("focus", handleFocus)
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadData()
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener("workoutCompleted", handleWorkoutCompleted)
+      window.removeEventListener("focus", handleFocus)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
   }, [])
 
   const calculateStats = (logs: WorkoutLog[]) => {

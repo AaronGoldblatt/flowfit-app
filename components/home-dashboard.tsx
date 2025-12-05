@@ -10,7 +10,7 @@ import { WorkoutDetailModal } from "@/components/workout-detail-modal"
 import { EducationModal } from "@/components/education-modal"
 import { getProfile } from "@/actions/profile"
 import { getCurrentCycle } from "@/actions/cycles"
-import { getWorkoutStats, getRecommendedWorkouts, getAlternativeWorkout } from "@/actions/workouts"
+import { getWorkoutStats, getRecommendedWorkouts, getAlternativeWorkout, logWorkout } from "@/actions/workouts"
 import { calculateCycleInfo, type CyclePhase } from "@/lib/cycle-utils"
 import type { WorkoutTemplate } from "@/database/schema/workouts"
 import { getPersonaMotivation } from "@/lib/personas"
@@ -282,7 +282,16 @@ export function HomeDashboard() {
     }
   }
 
-  const handleWorkoutComplete = (workoutId: string) => {
+  const handleWorkoutComplete = async (workoutId: string) => {
+    // Find the workout template
+    const workout = recommendedWorkouts.find(w => w.id === workoutId) || selectedWorkout
+    
+    if (!workout) {
+      console.error("Workout not found:", workoutId)
+      return
+    }
+
+    // Update local state
     const updated = [...completedWorkouts, workoutId]
     setCompletedWorkouts(updated)
     localStorage.setItem("flowfit-completed-workouts", JSON.stringify(updated))
@@ -294,6 +303,41 @@ export function HomeDashboard() {
       completed: true,
     })
     localStorage.setItem("flowfit-workout-history", JSON.stringify(history))
+
+    // Save to database
+    try {
+      const today = new Date().toISOString().split("T")[0]
+      const avgCalories = Math.round((workout.caloriesMin + workout.caloriesMax) / 2)
+      
+      const result = await logWorkout({
+        workoutTemplateId: workout.id,
+        workoutTitle: workout.title,
+        date: today,
+        duration: workout.duration,
+        caloriesBurned: avgCalories,
+        completed: true,
+      })
+
+      if (result.error) {
+        console.error("[HomeDashboard] Error logging workout:", result.error)
+      } else {
+        console.log("[HomeDashboard] Workout logged successfully:", result.data)
+        
+        // Refresh workout stats
+        const { data: stats } = await getWorkoutStats(7)
+        if (stats) {
+          console.log("[HomeDashboard] Updated workout stats:", stats)
+          setWorkoutStats(stats)
+        }
+
+        // Dispatch custom event to notify Progress View to refresh
+        console.log("[HomeDashboard] Dispatching workoutCompleted event...")
+        window.dispatchEvent(new CustomEvent("workoutCompleted"))
+        console.log("[HomeDashboard] workoutCompleted event dispatched")
+      }
+    } catch (error) {
+      console.error("Error logging workout:", error)
+    }
   }
 
   const handleWorkoutClick = (workout: Workout) => {
