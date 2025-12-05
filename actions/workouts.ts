@@ -192,13 +192,11 @@ export async function getWorkoutLogs(limit = 30) {
   try {
     const profileId = await getProfileId();
 
+    // Remove with query since relations are not defined
     const logs = await db.query.workoutLogs.findMany({
       where: eq(workoutLogs.profileId, profileId),
       orderBy: [desc(workoutLogs.date)],
       limit,
-      with: {
-        workoutTemplate: true,
-      },
     });
 
     return {
