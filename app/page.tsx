@@ -14,6 +14,8 @@ import {
 import { Moon } from "lucide-react";
 import Link from "next/link";
 
+// Deployment on vercel for last commits 12/04/2025 8:42 PM EST
+
 export default function Home() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
